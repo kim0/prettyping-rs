@@ -1,8 +1,215 @@
-use clap::Parser;
+use std::ffi::OsString;
+
+use clap::error::ErrorKind;
+use clap::{ArgAction, CommandFactory, Parser};
+
+use crate::config::{self, Config, ConfigInput, DEFAULT_LAST};
+
+const CLI_AFTER_HELP: &str = "Compatibility notes:\n  • Removed legacy flags: --awkbin, --pingbin (hard error).\n  • Unsupported legacy flags: -f, -R, -q, -a (hard error).\n  • Legacy -v is accepted and ignored for compatibility.";
 
 #[derive(Debug, Parser)]
-#[command(name = "prettyping-rs", about = "Rust port of prettyping")]
-pub struct CliArgs {
+#[command(
+    name = "prettyping-rs",
+    about = "Rust port of prettyping",
+    after_help = CLI_AFTER_HELP,
+    disable_version_flag = true
+)]
+struct RawCliArgs {
+    /// Destination host or IP
     #[arg(value_name = "HOST")]
-    pub host: Option<String>,
+    host: String,
+
+    // Kept prettyping flags
+    #[arg(long = "color", action = ArgAction::SetTrue)]
+    color: bool,
+    #[arg(long = "nocolor", action = ArgAction::SetTrue)]
+    nocolor: bool,
+    #[arg(long = "multicolor", action = ArgAction::SetTrue)]
+    multicolor: bool,
+    #[arg(long = "nomulticolor", action = ArgAction::SetTrue)]
+    nomulticolor: bool,
+    #[arg(long = "unicode", action = ArgAction::SetTrue)]
+    unicode: bool,
+    #[arg(long = "nounicode", action = ArgAction::SetTrue)]
+    nounicode: bool,
+    #[arg(long = "legend", action = ArgAction::SetTrue)]
+    legend: bool,
+    #[arg(long = "nolegend", action = ArgAction::SetTrue)]
+    nolegend: bool,
+    #[arg(long = "globalstats", action = ArgAction::SetTrue)]
+    globalstats: bool,
+    #[arg(long = "noglobalstats", action = ArgAction::SetTrue)]
+    noglobalstats: bool,
+    #[arg(long = "recentstats", action = ArgAction::SetTrue)]
+    recentstats: bool,
+    #[arg(long = "norecentstats", action = ArgAction::SetTrue)]
+    norecentstats: bool,
+    #[arg(long = "terminal", action = ArgAction::SetTrue)]
+    terminal: bool,
+    #[arg(long = "noterminal", action = ArgAction::SetTrue)]
+    noterminal: bool,
+    #[arg(long = "last", default_value_t = DEFAULT_LAST)]
+    last: u32,
+    #[arg(long = "columns")]
+    columns: Option<u16>,
+    #[arg(long = "lines")]
+    lines: Option<u16>,
+    #[arg(long = "rttmin")]
+    rttmin: Option<u32>,
+    #[arg(long = "rttmax")]
+    rttmax: Option<u32>,
+
+    // Native ping flags (explicitly handled in Rust)
+    #[arg(short = '4', long = "ipv4", action = ArgAction::SetTrue)]
+    ipv4: bool,
+    #[arg(short = '6', long = "ipv6", action = ArgAction::SetTrue)]
+    ipv6: bool,
+    #[arg(short = 'c', long = "count")]
+    count: Option<u32>,
+    #[arg(short = 'i', long = "interval")]
+    interval_secs: Option<f64>,
+    #[arg(short = 'W', long = "timeout")]
+    timeout_secs: Option<f64>,
+    #[arg(short = 's', long = "size")]
+    packet_size: Option<u32>,
+    #[arg(short = 't', long = "ttl")]
+    ttl: Option<u16>,
+
+    // Removed legacy passthrough flags - parsed only to emit explicit errors.
+    #[arg(long = "awkbin", value_name = "EXEC", hide = true)]
+    removed_awkbin: Option<String>,
+    #[arg(long = "pingbin", value_name = "EXEC", hide = true)]
+    removed_pingbin: Option<String>,
+
+    // Unsupported legacy flags - parsed only to emit explicit errors.
+    #[arg(short = 'a', action = ArgAction::SetTrue, hide = true)]
+    legacy_audible: bool,
+    #[arg(short = 'f', action = ArgAction::SetTrue, hide = true)]
+    legacy_flood: bool,
+    #[arg(short = 'R', action = ArgAction::SetTrue, hide = true)]
+    legacy_record_route: bool,
+    #[arg(short = 'q', action = ArgAction::SetTrue, hide = true)]
+    legacy_quiet: bool,
+
+    // Accepted legacy compatibility no-op.
+    #[arg(short = 'v', action = ArgAction::SetTrue, hide = true)]
+    legacy_verbose_ignored: bool,
+}
+
+pub fn parse_config_from_args<I, T>(args: I) -> Result<Config, clap::Error>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString>,
+{
+    let raw = RawCliArgs::try_parse_from(normalize_legacy_long_spellings(args))?;
+
+    if raw.removed_awkbin.is_some() {
+        return Err(usage_error(
+            "--awkbin was removed in prettyping-rs (pure Rust engine has no awk subprocess)",
+        ));
+    }
+    if raw.removed_pingbin.is_some() {
+        return Err(usage_error(
+            "--pingbin was removed in prettyping-rs (pure Rust engine has no ping subprocess)",
+        ));
+    }
+
+    if raw.legacy_audible {
+        return Err(usage_error("unsupported legacy flag: -a"));
+    }
+    if raw.legacy_flood {
+        return Err(usage_error("unsupported legacy flag: -f"));
+    }
+    if raw.legacy_record_route {
+        return Err(usage_error("unsupported legacy flag: -R"));
+    }
+    if raw.legacy_quiet {
+        return Err(usage_error("unsupported legacy flag: -q"));
+    }
+
+    let _ = raw.legacy_verbose_ignored;
+
+    let input = ConfigInput {
+        host: raw.host,
+        color: !raw.nocolor || raw.color,
+        multicolor: !raw.nomulticolor || raw.multicolor,
+        unicode: !raw.nounicode || raw.unicode,
+        legend: !raw.nolegend || raw.legend,
+        globalstats: !raw.noglobalstats || raw.globalstats,
+        recentstats: !raw.norecentstats || raw.recentstats,
+        terminal: if raw.terminal {
+            Some(true)
+        } else if raw.noterminal {
+            Some(false)
+        } else {
+            None
+        },
+        last: raw.last,
+        columns: raw.columns,
+        lines: raw.lines,
+        rttmin: raw.rttmin,
+        rttmax: raw.rttmax,
+        force_ipv4: raw.ipv4,
+        force_ipv6: raw.ipv6,
+        count: raw.count,
+        interval_secs: raw.interval_secs,
+        timeout_secs: raw.timeout_secs,
+        packet_size: raw.packet_size,
+        ttl: raw.ttl,
+    };
+
+    config::normalize(input).map_err(|err| usage_error(err.to_string()))
+}
+
+pub fn parse_config_from_env() -> Result<Config, clap::Error> {
+    parse_config_from_args(std::env::args_os())
+}
+
+fn usage_error(message: impl Into<String>) -> clap::Error {
+    let mut cmd = RawCliArgs::command();
+    cmd.error(ErrorKind::ValueValidation, message.into())
+}
+
+fn normalize_legacy_long_spellings<I, T>(args: I) -> Vec<OsString>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString>,
+{
+    args.into_iter()
+        .map(Into::into)
+        .map(|arg| {
+            arg.to_str()
+                .and_then(rewrite_legacy_single_dash_flag)
+                .map(OsString::from)
+                .unwrap_or(arg)
+        })
+        .collect()
+}
+
+fn rewrite_legacy_single_dash_flag(flag: &str) -> Option<&'static str> {
+    match flag {
+        "-help" => Some("--help"),
+        "-color" => Some("--color"),
+        "-nocolor" => Some("--nocolor"),
+        "-multicolor" => Some("--multicolor"),
+        "-nomulticolor" => Some("--nomulticolor"),
+        "-unicode" => Some("--unicode"),
+        "-nounicode" => Some("--nounicode"),
+        "-legend" => Some("--legend"),
+        "-nolegend" => Some("--nolegend"),
+        "-globalstats" => Some("--globalstats"),
+        "-noglobalstats" => Some("--noglobalstats"),
+        "-recentstats" => Some("--recentstats"),
+        "-norecentstats" => Some("--norecentstats"),
+        "-terminal" => Some("--terminal"),
+        "-noterminal" => Some("--noterminal"),
+        "-last" => Some("--last"),
+        "-columns" => Some("--columns"),
+        "-lines" => Some("--lines"),
+        "-rttmin" => Some("--rttmin"),
+        "-rttmax" => Some("--rttmax"),
+        "-awkbin" => Some("--awkbin"),
+        "-pingbin" => Some("--pingbin"),
+        _ => None,
+    }
 }
