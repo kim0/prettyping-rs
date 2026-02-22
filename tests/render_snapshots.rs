@@ -114,7 +114,7 @@ fn terminal_narrow_resize_snapshot() {
 
     for (index, event) in events.iter().enumerate() {
         if index == 3 {
-            renderer.update_size(16, 8);
+            renderer.update_size(Some(16), Some(8));
         }
         renderer.render_event(event);
     }

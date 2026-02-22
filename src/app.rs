@@ -118,6 +118,7 @@ where
         &mut next_send_at,
         &mut in_flight,
         &mut sent_meta,
+        &mut replied,
         &mut timed_out,
     )?;
 
@@ -208,6 +209,7 @@ where
             &mut next_send_at,
             &mut in_flight,
             &mut sent_meta,
+            &mut replied,
             &mut timed_out,
         )?;
     }
@@ -259,6 +261,7 @@ fn schedule_due<E>(
     next_send_at: &mut Duration,
     in_flight: &mut BTreeMap<SequenceNumber, InFlight>,
     sent_meta: &mut BTreeMap<SequenceNumber, SentMeta>,
+    replied: &mut BTreeSet<SequenceNumber>,
     timed_out: &mut BTreeSet<SequenceNumber>,
 ) -> Result<(), AppError>
 where
@@ -286,6 +289,8 @@ where
             )?;
         }
     }
+
+    prune_tracking_state(*next_seq, sent_meta, replied, timed_out);
 
     while should_send_more(config.count, *sent_total) && *next_send_at <= now {
         let seq = *next_seq;
@@ -347,4 +352,21 @@ fn add_duration(base: Duration, delta: Duration) -> Result<Duration, AppError> {
 
 fn duration_to_ms(duration: Duration) -> u64 {
     u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+}
+
+fn prune_tracking_state(
+    next_seq: SequenceNumber,
+    sent_meta: &mut BTreeMap<SequenceNumber, SentMeta>,
+    replied: &mut BTreeSet<SequenceNumber>,
+    timed_out: &mut BTreeSet<SequenceNumber>,
+) {
+    // Keep a bounded window so the default infinite ping mode does not grow memory.
+    // This window only needs to be large enough to classify late/duplicate replies.
+    const KEEP_WINDOW: SequenceNumber = 10_000;
+
+    let keep_from = next_seq.saturating_sub(KEEP_WINDOW);
+
+    sent_meta.retain(|seq, _| *seq >= keep_from);
+    replied.retain(|seq| *seq >= keep_from);
+    timed_out.retain(|seq| *seq >= keep_from);
 }

@@ -107,6 +107,7 @@ where
     if wants_help(&normalized) {
         return Err(help_error());
     }
+    let terminal_override = parse_terminal_override(&normalized);
 
     let raw = RawCliArgs::try_parse_from(normalized)?;
 
@@ -144,13 +145,7 @@ where
         legend: !raw.nolegend || raw.legend,
         globalstats: !raw.noglobalstats || raw.globalstats,
         recentstats: !raw.norecentstats || raw.recentstats,
-        terminal: if raw.terminal {
-            Some(true)
-        } else if raw.noterminal {
-            Some(false)
-        } else {
-            None
-        },
+        terminal: terminal_override,
         last: raw.last,
         columns: raw.columns,
         lines: raw.lines,
@@ -187,6 +182,18 @@ fn help_error() -> clap::Error {
     out.push_str(CLI_HELP_TEXT);
     out.push_str(CLI_AFTER_HELP);
     clap::Error::raw(ErrorKind::DisplayHelp, out)
+}
+
+fn parse_terminal_override(args: &[OsString]) -> Option<bool> {
+    args.iter().skip(1).fold(None, |current, arg| {
+        if arg == "--terminal" {
+            Some(true)
+        } else if arg == "--noterminal" {
+            Some(false)
+        } else {
+            current
+        }
+    })
 }
 
 fn normalize_legacy_long_spellings<I, T>(args: I) -> Vec<OsString>

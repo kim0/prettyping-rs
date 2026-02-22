@@ -7,10 +7,12 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 use super::{
-    EngineTime, PingEngine, PingEngineError, PingEvent, PingReply, ProbeRequest, TimedEvent,
+    EngineTime, PingEngine, PingEngineError, PingEvent, PingReply, ProbeRequest, SequenceNumber,
+    TimedEvent,
 };
 
 const UNIX_PERMISSION_DENIED_ERRNO: [i32; 2] = [1, 13]; // EPERM, EACCES
+const U16_MODULO: u64 = u16::MAX as u64 + 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnixSurgeEngineOptions {
@@ -187,11 +189,7 @@ impl PingEngine for UnixSurgeEngine {
             });
         }
 
-        let sequence_u16 =
-            u16::try_from(request.seq).map_err(|_| PingEngineError::InvalidProbeRequest {
-                seq: request.seq,
-                message: "sequence does not fit into surge-ping u16 sequence space".to_string(),
-            })?;
+        let sequence_u16 = fold_sequence_to_u16(request.seq);
 
         let payload = vec![0_u8; request.payload_size];
         let client = self.client.clone();
@@ -212,8 +210,9 @@ impl PingEngine for UnixSurgeEngine {
                 .await
             {
                 Ok((packet, _duration)) => {
-                    let reply_sequence = u64::from(packet.get_sequence().into_u16());
-                    if reply_sequence != requested_seq {
+                    let reply_sequence_u16 = packet.get_sequence().into_u16();
+                    let expected_reply_sequence = fold_sequence_to_u16(requested_seq);
+                    if reply_sequence_u16 != expected_reply_sequence {
                         return;
                     }
 
@@ -237,7 +236,7 @@ impl PingEngine for UnixSurgeEngine {
                     let timed_event = TimedEvent {
                         at: started_at.elapsed(),
                         event: PingEvent::Reply(PingReply {
-                            seq: reply_sequence,
+                            seq: requested_seq,
                             ttl,
                             payload_size: payload.len(),
                             source,
@@ -310,6 +309,10 @@ fn default_ping_identifier() -> surge_ping::PingIdentifier {
     let modulo = u32::from(u16::MAX) + 1;
     let value = std::process::id() % modulo;
     surge_ping::PingIdentifier(u16::try_from(value).unwrap_or(0))
+}
+
+fn fold_sequence_to_u16(seq: SequenceNumber) -> u16 {
+    u16::try_from(seq % U16_MODULO).unwrap_or(0)
 }
 
 fn format_io_error_with_guidance(context: &str, error: &std::io::Error) -> String {

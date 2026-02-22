@@ -57,10 +57,15 @@ impl TerminalRenderer {
         }
     }
 
-    pub fn update_size(&mut self, columns: u16, lines: u16) {
-        self.width = usize::from(columns).max(1);
-        self.config.columns = Some(columns);
-        self.config.lines = Some(lines);
+    pub fn update_size(&mut self, columns: Option<u16>, lines: Option<u16>) {
+        if let Some(columns) = columns {
+            self.width = usize::from(columns).max(1);
+            self.config.columns = Some(columns);
+        }
+
+        if let Some(lines) = lines {
+            self.config.lines = Some(lines);
+        }
     }
 
     pub fn render_event(&mut self, event: &AppEvent) {
@@ -93,6 +98,10 @@ impl TerminalRenderer {
     #[must_use]
     pub fn output(&self) -> &str {
         &self.out
+    }
+
+    pub fn output_mut(&mut self) -> &mut String {
+        &mut self.out
     }
 
     #[must_use]

@@ -1,4 +1,5 @@
 use std::io::{self, IsTerminal, Write};
+use std::num::NonZeroU16;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -154,7 +155,8 @@ where
 #[derive(Debug)]
 pub struct RenderDriver {
     renderer: Renderer,
-    flushed_len: usize,
+    terminal_columns_locked: bool,
+    terminal_lines_locked: bool,
 }
 
 impl RenderDriver {
@@ -162,6 +164,8 @@ impl RenderDriver {
     pub fn new(config: &Config, stdout_is_terminal: bool) -> Self {
         let use_terminal = config.terminal.unwrap_or(stdout_is_terminal);
         let mut render_config = RenderConfig::from(config);
+        let terminal_columns_locked = render_config.columns.is_some();
+        let terminal_lines_locked = render_config.lines.is_some();
 
         if use_terminal {
             if let Some((columns, lines)) = terminal_dimensions() {
@@ -175,13 +179,15 @@ impl RenderDriver {
 
             return Self {
                 renderer: Renderer::Terminal(TerminalRenderer::new(render_config)),
-                flushed_len: 0,
+                terminal_columns_locked,
+                terminal_lines_locked,
             };
         }
 
         Self {
             renderer: Renderer::Plain(PlainRenderer::new(render_config)),
-            flushed_len: 0,
+            terminal_columns_locked,
+            terminal_lines_locked,
         }
     }
 
@@ -211,27 +217,43 @@ impl RenderDriver {
     }
 
     fn update_terminal_size(&mut self) {
-        let Some((columns, lines)) = terminal_dimensions() else {
+        self.update_terminal_size_with(terminal_dimensions());
+    }
+
+    fn update_terminal_size_with(&mut self, dimensions: Option<(u16, u16)>) {
+        let Some((columns, lines)) = dimensions else {
             return;
         };
 
-        self.renderer.update_size(columns, lines);
+        let effective_columns = if self.terminal_columns_locked {
+            None
+        } else {
+            NonZeroU16::new(columns).map(NonZeroU16::get)
+        };
+
+        let effective_lines = if self.terminal_lines_locked {
+            None
+        } else {
+            NonZeroU16::new(lines).map(NonZeroU16::get)
+        };
+
+        self.renderer
+            .update_size(effective_columns, effective_lines);
     }
 
     fn flush_incremental_output(&mut self, writer: &mut impl Write) -> io::Result<()> {
-        let output = self.renderer.output();
-
-        if self.flushed_len > output.len() {
-            self.flushed_len = 0;
-        }
-
-        if self.flushed_len < output.len() {
-            let bytes = output.as_bytes();
-            writer.write_all(&bytes[self.flushed_len..])?;
-            self.flushed_len = output.len();
+        let output = self.renderer.output_mut();
+        if !output.is_empty() {
+            writer.write_all(output.as_bytes())?;
+            output.clear();
         }
 
         writer.flush()
+    }
+
+    #[cfg(test)]
+    fn flush_incremental_output_for_test(&mut self, writer: &mut impl Write) -> io::Result<()> {
+        self.flush_incremental_output(writer)
     }
 }
 
@@ -256,14 +278,14 @@ impl Renderer {
         }
     }
 
-    fn output(&self) -> &str {
+    fn output_mut(&mut self) -> &mut String {
         match self {
-            Self::Plain(renderer) => renderer.output(),
-            Self::Terminal(renderer) => renderer.output(),
+            Self::Plain(renderer) => renderer.output_mut(),
+            Self::Terminal(renderer) => renderer.output_mut(),
         }
     }
 
-    fn update_size(&mut self, columns: u16, lines: u16) {
+    fn update_size(&mut self, columns: Option<u16>, lines: Option<u16>) {
         if let Self::Terminal(renderer) = self {
             renderer.update_size(columns, lines);
         }
@@ -540,5 +562,90 @@ mod tests {
                 &mut output,
             )
             .expect("resize hint should not fail");
+    }
+
+    #[test]
+    fn render_driver_clears_renderer_buffer_after_flush() {
+        let config = base_render_config();
+        let mut driver = RenderDriver::new(&config, false);
+        let mut output = Vec::new();
+
+        driver
+            .observe_event(
+                &AppEvent::ProbeTimeout {
+                    seq: 1,
+                    sent_at: Duration::ZERO,
+                    deadline: ms(900),
+                },
+                false,
+                &mut output,
+            )
+            .expect("render should succeed");
+
+        // If the buffer is not cleared, a second flush would write the same bytes again.
+        let first_len = output.len();
+        driver
+            .flush_incremental_output_for_test(&mut output)
+            .expect("flush should succeed");
+        assert_eq!(output.len(), first_len);
+    }
+
+    #[test]
+    fn render_driver_resize_does_not_override_manual_columns_setting() {
+        let mut config = base_render_config();
+        config.terminal = Some(true);
+        config.columns = Some(80);
+        config.lines = None;
+
+        let mut driver = RenderDriver::new(&config, true);
+
+        // Render a few events to produce output at the configured width.
+        let mut output = Vec::new();
+        for seq in 1..=90 {
+            driver
+                .observe_event(
+                    &AppEvent::ProbeTimeout {
+                        seq,
+                        sent_at: Duration::ZERO,
+                        deadline: ms(900),
+                    },
+                    false,
+                    &mut output,
+                )
+                .expect("render should succeed");
+        }
+
+        // Resize should NOT change columns when user set --columns.
+        driver.update_terminal_size_with(Some((120, 40)));
+
+        // After resizing, rendering should still wrap at around 80 columns, not 120.
+        let before = String::from_utf8_lossy(&output).to_string();
+        let before_max_line = before.lines().map(|l| l.len()).max().unwrap_or(0);
+
+        output.clear();
+        for seq in 91..=180 {
+            driver
+                .observe_event(
+                    &AppEvent::ProbeTimeout {
+                        seq,
+                        sent_at: Duration::ZERO,
+                        deadline: ms(900),
+                    },
+                    false,
+                    &mut output,
+                )
+                .expect("render should succeed");
+        }
+
+        let after = String::from_utf8_lossy(&output).to_string();
+        let after_max_line = after.lines().map(|l| l.len()).max().unwrap_or(0);
+
+        // Allow some slack for terminal control sequences and legend/stats lines.
+        assert!(before_max_line <= 200);
+        assert!(after_max_line <= 200);
+        assert!(after_max_line < 300);
+
+        // The key property: it should not become substantially wider after resize.
+        assert!(after_max_line <= before_max_line.saturating_add(40));
     }
 }

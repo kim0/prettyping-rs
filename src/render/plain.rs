@@ -71,6 +71,10 @@ impl PlainRenderer {
         &self.out
     }
 
+    pub fn output_mut(&mut self) -> &mut String {
+        &mut self.out
+    }
+
     #[must_use]
     pub fn into_output(self) -> String {
         self.out
