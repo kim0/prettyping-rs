@@ -147,6 +147,7 @@ fn help_mentions_removed_and_unsupported_flags() {
     let help = err.to_string();
 
     assert_eq!(err.exit_code(), 0);
+    assert!(help.contains("--[no]color        Enable/disable color output. (default: enabled)"));
     assert!(help.contains("Removed legacy flags: --awkbin, --pingbin"));
     assert!(help.contains("Unsupported legacy flags: -f, -R, -q, -a"));
 }

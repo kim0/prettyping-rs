@@ -7,6 +7,8 @@ use crate::config::{self, Config, ConfigInput, DEFAULT_LAST};
 
 const CLI_AFTER_HELP: &str = "Compatibility notes:\n  - Removed legacy flags: --awkbin, --pingbin (hard error).\n  - Unsupported legacy flags: -f, -R, -q, -a (hard error).\n  - Legacy -v is accepted and ignored for compatibility.";
 
+const CLI_HELP_TEXT: &str = "Usage: prettyping-rs [prettyping parameters] <host>\n\nThis is a Rust port of prettyping. It prints each ping response as a compact\ncharacter graph, with optional color and stats lines.\n\nprettyping parameters:\n  --[no]color        Enable/disable color output. (default: enabled)\n  --[no]multicolor   Enable/disable multi-color output. Has no effect if\n                       color or unicode is disabled. (default: enabled)\n  --[no]unicode      Enable/disable unicode characters. (default: enabled)\n  --[no]legend       Enable/disable the latency legend. (default: enabled)\n  --[no]globalstats  Enable/disable the global statistics line. (default: enabled)\n  --[no]recentstats  Enable/disable the last n statistics line. (default: enabled)\n  --[no]terminal     Force the output designed for a terminal. (default: auto)\n  --last <n>         Use the last n pings at the statistics line. (default: 60)\n  --columns <n>      Override auto-detection of terminal dimensions.\n  --lines <n>        Override auto-detection of terminal dimensions.\n  --rttmin <n>       Minimum RTT represented in the graph. (default: auto)\n  --rttmax <n>       Maximum RTT represented in the graph. (default: auto)\n\nping parameters handled by prettyping-rs:\n  -4, --ipv4         Use IPv4 only.\n  -6, --ipv6         Use IPv6 only.\n  -c, --count <n>    Stop after sending n probes.\n  -i, --interval <s> Interval between probes in seconds.\n  -W, --timeout <s>  Per-probe timeout in seconds.\n  -s, --size <n>     Payload size in bytes.\n  -t, --ttl <n>      IP time-to-live (hop limit).\n\n";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "prettyping-rs",
@@ -101,7 +103,12 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString>,
 {
-    let raw = RawCliArgs::try_parse_from(normalize_legacy_long_spellings(args))?;
+    let normalized = normalize_legacy_long_spellings(args);
+    if wants_help(&normalized) {
+        return Err(help_error());
+    }
+
+    let raw = RawCliArgs::try_parse_from(normalized)?;
 
     if raw.removed_awkbin.is_some() {
         return Err(usage_error(
@@ -168,6 +175,18 @@ pub fn parse_config_from_env() -> Result<Config, clap::Error> {
 fn usage_error(message: impl Into<String>) -> clap::Error {
     let mut cmd = RawCliArgs::command();
     cmd.error(ErrorKind::ValueValidation, message.into())
+}
+
+fn wants_help(args: &[OsString]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--help" || arg == "-h" || arg == "-help" || arg == "--h")
+}
+
+fn help_error() -> clap::Error {
+    let mut out = String::new();
+    out.push_str(CLI_HELP_TEXT);
+    out.push_str(CLI_AFTER_HELP);
+    clap::Error::raw(ErrorKind::DisplayHelp, out)
 }
 
 fn normalize_legacy_long_spellings<I, T>(args: I) -> Vec<OsString>

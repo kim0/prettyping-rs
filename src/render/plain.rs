@@ -27,7 +27,7 @@ impl PlainRenderer {
 
         let mut out = String::new();
         if config.legend {
-            out.push_str(&palette.legend_line());
+            out.push_str(&palette.legend_line_painted());
             out.push('\n');
         }
 

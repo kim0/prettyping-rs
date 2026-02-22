@@ -1,4 +1,4 @@
-0 _ 20 . 40 o 60 O 80 _ 100 . 120 o 140 O 160 _ 180 . 200 o 220 O inf
+0 <ESC>[0;32m_<ESC>[0m 20 <ESC>[0;32m.<ESC>[0m 40 <ESC>[0;32mo<ESC>[0m 60 <ESC>[0;32mO<ESC>[0m 80 <ESC>[0;33m_<ESC>[0m 100 <ESC>[0;33m.<ESC>[0m 120 <ESC>[0;33mo<ESC>[0m 140 <ESC>[0;33mO<ESC>[0m 160 <ESC>[0;31m_<ESC>[0m 180 <ESC>[0;31m.<ESC>[0m 200 <ESC>[0;31mo<ESC>[0m 220 <ESC>[0;31mO<ESC>[0m inf
 <ESC>[0m
 <ESC>[0m
 <ESC>[A<ESC>[A<ESC>[2K<ESC>[0;32m_<ESC>[0m<ESC>7

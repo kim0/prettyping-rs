@@ -131,6 +131,32 @@ impl Palette {
     }
 
     #[must_use]
+    pub fn legend_line_painted(&self) -> String {
+        if self.items.len() <= 1 {
+            return String::new();
+        }
+
+        let mut out = String::new();
+        out.push_str("0 ");
+        out.push_str(&self.paint(self.items[0]));
+
+        let len = self.items.len();
+        for index in 1..len {
+            let lower_bound = self.rtt_min.saturating_add(
+                (u64::from(index as u32 - 1).saturating_mul(u64::from(self.rtt_range()))
+                    / u64::from((len as u32).saturating_sub(2).max(1))) as u32,
+            );
+            out.push(' ');
+            out.push_str(&lower_bound.to_string());
+            out.push(' ');
+            out.push_str(&self.paint(self.items[index]));
+        }
+
+        out.push_str(" inf");
+        out
+    }
+
+    #[must_use]
     pub fn paint(&self, item: PaletteItem) -> String {
         match item.color {
             SymbolColor::Default => item.ch.to_string(),

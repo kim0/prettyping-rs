@@ -1,7 +1,8 @@
 use crate::app::AppEvent;
 use crate::render::palette::Palette;
 use crate::render::{
-    format_global_stats_line_terminal, format_recent_stats_line, trim_to_width, RenderConfig,
+    format_global_stats_line_terminal, format_recent_stats_line, trim_ansi_to_width, trim_to_width,
+    RenderConfig,
 };
 use crate::stats::Stats;
 
@@ -36,7 +37,7 @@ impl TerminalRenderer {
 
         let mut out = String::new();
         if config.legend {
-            out.push_str(&trim_to_width(&palette.legend_line(), width));
+            out.push_str(&trim_ansi_to_width(&palette.legend_line_painted(), width));
             out.push('\n');
         }
 
