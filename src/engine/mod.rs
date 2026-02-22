@@ -8,6 +8,9 @@ pub mod mock;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub mod unix_surge;
 
+#[cfg(target_os = "windows")]
+pub mod windows_ping_async;
+
 pub type SequenceNumber = u64;
 pub type EngineTime = Duration;
 

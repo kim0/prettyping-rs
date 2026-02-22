@@ -23,13 +23,35 @@ pub fn run() -> Result<(), clap::Error> {
         run_with_unix_backend(app_config)
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    #[cfg(target_os = "windows")]
+    {
+        run_with_windows_backend(app_config)
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
         let _ = app_config;
         Err(runtime_error(
-            "runtime backend is not implemented on this platform yet (M4 pending)",
+            "runtime backend is not supported on this platform",
         ))
     }
+}
+
+#[cfg(test)]
+#[must_use]
+fn selected_runtime_backend() -> &'static str {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        return "unix_surge";
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        return "windows_ping_async";
+    }
+
+    #[allow(unreachable_code)]
+    "unsupported"
 }
 
 fn resolve_target(config: &config::Config) -> Result<IpAddr, clap::Error> {
@@ -113,6 +135,22 @@ fn run_with_unix_backend(app_config: app::AppConfig) -> Result<(), clap::Error> 
         .map_err(|err| runtime_error(format!("ping runtime failed: {err}")))
 }
 
+#[cfg(target_os = "windows")]
+fn run_with_windows_backend(app_config: app::AppConfig) -> Result<(), clap::Error> {
+    let mut engine = engine::windows_ping_async::WindowsPingAsyncEngine::new(
+        engine::windows_ping_async::WindowsPingAsyncEngineOptions {
+            target: app_config.target,
+            timeout: app_config.timeout,
+            ttl: app_config.ttl,
+        },
+    )
+    .map_err(|err| runtime_error(err.to_string()))?;
+
+    app::run(&mut engine, &app_config)
+        .map(|_| ())
+        .map_err(|err| runtime_error(format!("ping runtime failed: {err}")))
+}
+
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr};
@@ -163,5 +201,17 @@ mod tests {
         assert_eq!(runtime.timeout, Duration::from_secs(1));
         assert_eq!(runtime.payload_size, 56);
         assert_eq!(runtime.ttl, None);
+    }
+
+    #[test]
+    fn selects_runtime_backend_for_current_platform() {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        assert_eq!(super::selected_runtime_backend(), "unix_surge");
+
+        #[cfg(target_os = "windows")]
+        assert_eq!(super::selected_runtime_backend(), "windows_ping_async");
+
+        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+        assert_eq!(super::selected_runtime_backend(), "unsupported");
     }
 }
