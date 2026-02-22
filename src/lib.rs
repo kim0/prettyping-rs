@@ -203,8 +203,8 @@ mod tests {
 
     #[test]
     fn uses_runtime_defaults_when_native_ping_flags_are_missing() {
-        let config = parse_config_from_args(["prettyping", "example.com"])
-            .expect("cli parsing should pass");
+        let config =
+            parse_config_from_args(["prettyping", "example.com"]).expect("cli parsing should pass");
 
         let runtime = map_runtime_config(&config, IpAddr::V4(Ipv4Addr::LOCALHOST))
             .expect("runtime mapping should pass");

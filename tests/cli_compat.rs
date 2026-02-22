@@ -5,8 +5,7 @@ use prettyping_rs::config::AddressFamily;
 
 #[test]
 fn defaults_match_prettyping_behavior() {
-    let cfg =
-        parse_config_from_args(["prettyping", "example.com"]).expect("parse should succeed");
+    let cfg = parse_config_from_args(["prettyping", "example.com"]).expect("parse should succeed");
 
     assert_eq!(cfg.host, "example.com");
     assert!(cfg.color);
@@ -135,8 +134,8 @@ fn unsupported_legacy_flags_are_rejected() {
 
 #[test]
 fn legacy_verbose_flag_is_accepted_and_ignored() {
-    let cfg = parse_config_from_args(["prettyping", "-v", "example.com"])
-        .expect("-v should be accepted");
+    let cfg =
+        parse_config_from_args(["prettyping", "-v", "example.com"]).expect("-v should be accepted");
     assert_eq!(cfg.host, "example.com");
 }
 
@@ -160,8 +159,8 @@ fn rejects_invalid_rtt_range() {
 
 #[test]
 fn rejects_family_conflicts() {
-    let err = parse_config_from_args(["prettyping", "-4", "-6", "example.com"])
-        .expect_err("must fail");
+    let err =
+        parse_config_from_args(["prettyping", "-4", "-6", "example.com"]).expect_err("must fail");
     assert_eq!(err.exit_code(), 2);
     assert!(err.to_string().contains("cannot use -4 and -6 together"));
 
