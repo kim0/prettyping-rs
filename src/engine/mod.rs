@@ -5,6 +5,9 @@ use thiserror::Error;
 
 pub mod mock;
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub mod unix_surge;
+
 pub type SequenceNumber = u64;
 pub type EngineTime = Duration;
 
