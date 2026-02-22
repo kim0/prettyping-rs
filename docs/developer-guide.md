@@ -35,6 +35,21 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 ```
 
+## Release workflow
+
+This repo uses `cargo-release` to keep Cargo versions and git tags in sync.
+
+```bash
+cargo release patch --execute
+```
+
+Examples: `minor`, `major`.
+
+- Tag format is `v<version>` (for example: `v1.2.3`).
+- CI enforces that `Cargo.toml` version matches tag version.
+
+Crates publishing is handled by `.github/workflows/publish-crates.yml` using crates.io Trusted Publishing (OIDC).
+
 ## Running locally
 
 ```bash
