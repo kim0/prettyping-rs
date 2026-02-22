@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_dir="prettyping-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir -p "$asset_dir"
+          cp "target/${{ matrix.target }}/release/prettyping" "$asset_dir/"
+          if [[ -f README.md ]]; then cp README.md "$asset_dir/"; fi
+          if [[ -f LICENSE ]]; then cp LICENSE "$asset_dir/"; fi
+          tar -czf "${asset_dir}.tar.gz" "$asset_dir"
+          mkdir -p dist
+          mv "${asset_dir}.tar.gz" dist/
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $assetDir = "prettyping-${env:GITHUB_REF_NAME}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/prettyping.exe" "$assetDir/"
+          if (Test-Path README.md) { Copy-Item README.md "$assetDir/" }
+          if (Test-Path LICENSE) { Copy-Item LICENSE "$assetDir/" }
+          Compress-Archive -Path $assetDir -DestinationPath "${assetDir}.zip" -Force
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Move-Item "${assetDir}.zip" dist/
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-artifacts/*
