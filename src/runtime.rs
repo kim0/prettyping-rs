@@ -34,7 +34,19 @@ where
     E: PingEngine,
 {
     let signals = RuntimeSignals::install()?;
-    let mut driver = RenderDriver::new(config, io::stdout().is_terminal());
+    let stdout_is_terminal = io::stdout().is_terminal();
+
+    #[cfg(target_os = "windows")]
+    {
+        let use_terminal = config.terminal.unwrap_or(stdout_is_terminal);
+        // Best-effort enabling of ANSI/VT escape processing for classic Windows console hosts.
+        // If this fails (e.g., redirected output), we continue and the user may see raw escapes.
+        if use_terminal {
+            let _ = crate::windows_console::enable_virtual_terminal_processing();
+        }
+    }
+
+    let mut driver = RenderDriver::new(config, stdout_is_terminal);
 
     let stdout = io::stdout();
     let mut writer = stdout.lock();
@@ -42,14 +54,16 @@ where
     let mut interrupting_engine =
         InterruptingEngine::new(engine, signals.interrupt_flag(), INTERRUPT_POLL_SLICE);
 
-    let run_result = app::run_with_observer(&mut interrupting_engine, app_config, |event| {
-        let resize_requested = signals.take_resize_requested();
-        driver
-            .observe_event(event, resize_requested, &mut writer)
-            .map_err(|err| AppError::Observer {
-                message: err.to_string(),
-            })
-    });
+    // Streaming mode: do not retain an unbounded event log in memory.
+    let run_result =
+        app::run_streaming_with_observer(&mut interrupting_engine, app_config, |event| {
+            let resize_requested = signals.take_resize_requested();
+            driver
+                .observe_event(event, resize_requested, &mut writer)
+                .map_err(|err| AppError::Observer {
+                    message: err.to_string(),
+                })
+        });
 
     let finish_result = driver.finish(&mut writer);
 

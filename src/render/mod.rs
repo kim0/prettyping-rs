@@ -68,14 +68,14 @@ pub(crate) fn format_global_stats_line_plain(
 
 pub(crate) fn format_recent_stats_line(snapshot: &crate::stats::RecentStatsSnapshot) -> String {
     format!(
-        "{:>2}/{:>3} ({:>2}%) lost; {:>4}/{:>4}/{:>4}/{:>4}ms (last {})",
+        "{:>2}/{:>3} ({:>2}%) lost; {:>4}/{:>4}/{:>4}/{:>4}ms stddev (last {})",
         snapshot.loss.lost,
         snapshot.loss.total,
         snapshot.loss.percent,
         snapshot.rtt.min_ms,
         snapshot.rtt.avg_ms,
         snapshot.rtt.max_ms,
-        snapshot.rtt.mdev_ms,
+        snapshot.rtt.stddev_ms,
         snapshot.rtt.count
     )
 }

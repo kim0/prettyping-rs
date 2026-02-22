@@ -7,7 +7,7 @@ pub struct IntegerStats {
     pub min_ms: u32,
     pub avg_ms: u32,
     pub max_ms: u32,
-    pub mdev_ms: u32,
+    pub stddev_ms: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,14 +114,15 @@ impl Stats {
             self.total_lost,
             self.total_lost.saturating_add(self.total_received),
         );
-        let (min_ms, avg_ms, max_ms, mdev_ms) = if self.total_received == 0 {
+        let (min_ms, avg_ms, max_ms, stddev_ms) = if self.total_received == 0 {
             (0, 0, 0, 0)
         } else {
             let min = self.min_rtt_ms.unwrap_or(0);
             let max = self.max_rtt_ms.unwrap_or(0);
             let avg = div_u64_to_u32(self.total_rtt_sum, self.total_received);
-            let mdev = average_abs_deviation(recent_rtt_values(self.recent.iter()));
-            (min, avg, max, mdev)
+            // We don't track full history of RTTs, so compute stddev over the recent window.
+            let stddev = standard_deviation_ms(recent_rtt_values(self.recent.iter()));
+            (min, avg, max, stddev)
         };
 
         GlobalStatsSnapshot {
@@ -131,7 +132,7 @@ impl Stats {
                 min_ms,
                 avg_ms,
                 max_ms,
-                mdev_ms,
+                stddev_ms,
             },
             last_rtt_ms: self.last_rtt_ms,
         }
@@ -184,7 +185,7 @@ fn integer_stats_from_values(values: &[u32]) -> IntegerStats {
             min_ms: 0,
             avg_ms: 0,
             max_ms: 0,
-            mdev_ms: 0,
+            stddev_ms: 0,
         };
     }
 
@@ -199,14 +200,14 @@ fn integer_stats_from_values(values: &[u32]) -> IntegerStats {
 
     let count = u64::try_from(values.len()).unwrap_or(u64::MAX);
     let avg = div_u64_to_u32(sum, count);
-    let mdev = average_abs_deviation(values.iter().copied());
+    let stddev = standard_deviation_ms(values.iter().copied());
 
     IntegerStats {
         count,
         min_ms: min,
         avg_ms: avg,
         max_ms: max,
-        mdev_ms: mdev,
+        stddev_ms: stddev,
     }
 }
 
@@ -223,27 +224,37 @@ fn loss_stats(lost: u64, total: u64) -> LossStats {
     }
 }
 
-fn average_abs_deviation<I>(values: I) -> u32
+fn standard_deviation_ms<I>(values: I) -> u32
 where
     I: IntoIterator<Item = u32>,
 {
-    let data: Vec<u32> = values.into_iter().collect();
-    if data.is_empty() {
+    // Population standard deviation, rounded to the nearest integer millisecond.
+    // Uses Welford's online algorithm for numerical stability.
+    let mut n: u64 = 0;
+    let mut mean: f64 = 0.0;
+    let mut m2: f64 = 0.0;
+
+    for value in values {
+        n += 1;
+        let x = f64::from(value);
+        let delta = x - mean;
+        mean += delta / n as f64;
+        let delta2 = x - mean;
+        m2 += delta * delta2;
+    }
+
+    if n == 0 {
         return 0;
     }
 
-    let count = u64::try_from(data.len()).unwrap_or(u64::MAX);
-    let sum = data
-        .iter()
-        .fold(0u64, |acc, value| acc.saturating_add(u64::from(*value)));
-    let avg = i64::from(div_u64_to_u32(sum, count));
+    let variance = m2 / n as f64;
+    let stddev = variance.sqrt();
 
-    let total_abs_diff = data.iter().fold(0u64, |acc, value| {
-        let diff = (i64::from(*value) - avg).unsigned_abs();
-        acc.saturating_add(diff)
-    });
+    if !stddev.is_finite() {
+        return 0;
+    }
 
-    div_u64_to_u32(total_abs_diff, count)
+    u32::try_from(stddev.round() as u64).unwrap_or(u32::MAX)
 }
 
 fn div_u64_to_u32(numerator: u64, denominator: u64) -> u32 {

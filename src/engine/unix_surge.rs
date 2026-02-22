@@ -107,7 +107,12 @@ impl UnixSurgeEngine {
 
     fn handle_backend_message(&mut self, message: BackendMessage) {
         match message {
-            BackendMessage::Reply(timed_event) => {
+            BackendMessage::Reply(mut timed_event) => {
+                // Keep the engine timeline monotonic even if a reply is observed late.
+                // We never want to store (or later drop) events that appear to be in the past.
+                if timed_event.at < self.now {
+                    timed_event.at = self.now;
+                }
                 self.pending
                     .entry(timed_event.at)
                     .or_default()
@@ -122,12 +127,6 @@ impl UnixSurgeEngine {
     }
 
     fn take_ready_events(&mut self, deadline: EngineTime) -> Option<Vec<TimedEvent>> {
-        let stale_times: Vec<EngineTime> =
-            self.pending.range(..self.now).map(|(at, _)| *at).collect();
-        for at in stale_times {
-            let _ = self.pending.remove(&at);
-        }
-
         let selected_time = self
             .pending
             .range(self.now..=deadline)

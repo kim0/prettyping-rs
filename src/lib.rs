@@ -13,6 +13,9 @@ pub mod ring_buffer;
 pub mod runtime;
 pub mod stats;
 
+#[cfg(target_os = "windows")]
+pub mod windows_console;
+
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 const DEFAULT_PAYLOAD_SIZE: usize = 56;

@@ -96,6 +96,34 @@ where
     E: PingEngine,
     F: FnMut(&AppEvent) -> Result<(), AppError>,
 {
+    run_with_observer_internal(engine, config, &mut observer, true)
+}
+
+/// Like [`run_with_observer`], but does not retain an unbounded in-memory event log.
+///
+/// This is intended for long-running interactive sessions (weeks) where we only need
+/// live rendering via the observer callback and bounded counters in the returned report.
+pub fn run_streaming_with_observer<E, F>(
+    engine: &mut E,
+    config: &AppConfig,
+    mut observer: F,
+) -> Result<AppReport, AppError>
+where
+    E: PingEngine,
+    F: FnMut(&AppEvent) -> Result<(), AppError>,
+{
+    run_with_observer_internal(engine, config, &mut observer, false)
+}
+
+fn run_with_observer_internal<E>(
+    engine: &mut E,
+    config: &AppConfig,
+    observer: &mut impl FnMut(&AppEvent) -> Result<(), AppError>,
+    record_events: bool,
+) -> Result<AppReport, AppError>
+where
+    E: PingEngine,
+{
     validate_config(config)?;
 
     let mut report = AppReport::default();
@@ -111,8 +139,9 @@ where
     schedule_due(
         engine,
         config,
-        &mut observer,
+        observer,
         &mut report,
+        record_events,
         &mut sent_total,
         &mut next_seq,
         &mut next_send_at,
@@ -153,7 +182,8 @@ where
                                     duplicate: false,
                                     late: false,
                                 },
-                                &mut observer,
+                                observer,
+                                record_events,
                             )?;
                         }
                     } else if let Some(meta) = sent_meta.get(&seq) {
@@ -179,7 +209,8 @@ where
                                 duplicate,
                                 late,
                             },
-                            &mut observer,
+                            observer,
+                            record_events,
                         )?;
                     }
                 }
@@ -188,7 +219,8 @@ where
                     record_event(
                         &mut report,
                         AppEvent::Interrupted { at: timed_event.at },
-                        &mut observer,
+                        observer,
+                        record_events,
                     )?;
                     break;
                 }
@@ -202,8 +234,9 @@ where
         schedule_due(
             engine,
             config,
-            &mut observer,
+            observer,
             &mut report,
+            record_events,
             &mut sent_total,
             &mut next_seq,
             &mut next_send_at,
@@ -256,6 +289,7 @@ fn schedule_due<E>(
     config: &AppConfig,
     observer: &mut impl FnMut(&AppEvent) -> Result<(), AppError>,
     report: &mut AppReport,
+    record_events: bool,
     sent_total: &mut u64,
     next_seq: &mut SequenceNumber,
     next_send_at: &mut Duration,
@@ -268,6 +302,12 @@ where
     E: PingEngine,
 {
     let now = engine.now();
+
+    // Avoid burst sending after long pauses (sleep, debugger stop, heavy scheduling delays).
+    // We intentionally do not attempt to "catch up" missed intervals.
+    if *next_send_at < now {
+        *next_send_at = now;
+    }
 
     let expired: Vec<SequenceNumber> = in_flight
         .iter()
@@ -286,6 +326,7 @@ where
                     deadline: inflight.deadline,
                 },
                 observer,
+                record_events,
             )?;
         }
     }
@@ -311,7 +352,12 @@ where
         in_flight.insert(seq, InFlight { sent_at, deadline });
         sent_meta.insert(seq, SentMeta { sent_at });
         report.sent = report.sent.saturating_add(1);
-        record_event(report, AppEvent::ProbeSent { seq, at: sent_at }, observer)?;
+        record_event(
+            report,
+            AppEvent::ProbeSent { seq, at: sent_at },
+            observer,
+            record_events,
+        )?;
 
         *sent_total = sent_total.saturating_add(1);
         *next_seq = next_seq.saturating_add(1);
@@ -325,9 +371,12 @@ fn record_event(
     report: &mut AppReport,
     event: AppEvent,
     observer: &mut impl FnMut(&AppEvent) -> Result<(), AppError>,
+    record_events: bool,
 ) -> Result<(), AppError> {
     observer(&event)?;
-    report.events.push(event);
+    if record_events {
+        report.events.push(event);
+    }
     Ok(())
 }
 
@@ -366,7 +415,12 @@ fn prune_tracking_state(
 
     let keep_from = next_seq.saturating_sub(KEEP_WINDOW);
 
-    sent_meta.retain(|seq, _| *seq >= keep_from);
-    replied.retain(|seq| *seq >= keep_from);
-    timed_out.retain(|seq| *seq >= keep_from);
+    let kept_sent_meta = sent_meta.split_off(&keep_from);
+    *sent_meta = kept_sent_meta;
+
+    let kept_replied = replied.split_off(&keep_from);
+    *replied = kept_replied;
+
+    let kept_timed_out = timed_out.split_off(&keep_from);
+    *timed_out = kept_timed_out;
 }

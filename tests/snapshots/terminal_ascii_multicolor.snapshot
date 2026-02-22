@@ -3,14 +3,14 @@
 <ESC>[0m
 <ESC>[A<ESC>[A<ESC>[2K<ESC>[0;32m_<ESC>[0m<ESC>7
 <ESC>[2K 0/  1 ( 0%) lost;   12/  12/  12ms; last:   12ms
-<ESC>[2K 0/  1 ( 0%) lost;   12/  12/  12/   0ms (last 1)<ESC>8<ESC>[0;32mo<ESC>[0m<ESC>7
+<ESC>[2K 0/  1 ( 0%) lost;   12/  12/  12/   0ms stddev (last 1)<ESC>8<ESC>[0;32mo<ESC>[0m<ESC>7
 <ESC>[2K 0/  2 ( 0%) lost;   12/  28/  45ms; last:   45ms
-<ESC>[2K 0/  2 ( 0%) lost;   12/  28/  45/  16ms (last 2)<ESC>8<ESC>[0;31m!<ESC>[0m<ESC>7
+<ESC>[2K 0/  2 ( 0%) lost;   12/  28/  45/  17ms stddev (last 2)<ESC>8<ESC>[0;31m!<ESC>[0m<ESC>7
 <ESC>[2K 1/  3 (33%) lost;   12/  28/  45ms; last:   45ms
-<ESC>[2K 1/  3 (33%) lost;   12/  28/  45/  16ms (last 2)<ESC>8<ESC>[0;31mo<ESC>[0m<ESC>7
+<ESC>[2K 1/  3 (33%) lost;   12/  28/  45/  17ms stddev (last 2)<ESC>8<ESC>[0;31mo<ESC>[0m<ESC>7
 <ESC>[2K 1/  4 (25%) lost;   12/  89/ 210ms; last:  210ms
-<ESC>[2K 1/  4 (25%) lost;   12/  89/ 210/  80ms (last 3)<ESC>8<ESC>[0;33m_<ESC>[0m<ESC>7
+<ESC>[2K 1/  4 (25%) lost;   12/  89/ 210/  87ms stddev (last 3)<ESC>8<ESC>[0;33m_<ESC>[0m<ESC>7
 <ESC>[2K 1/  5 (20%) lost;   12/  86/ 210ms; last:   80ms
-<ESC>[2K 1/  4 (25%) lost;   45/ 111/ 210/  65ms (last 3)<ESC>8<ESC>[0;31m!<ESC>[0m<ESC>7
+<ESC>[2K 1/  4 (25%) lost;   45/ 111/ 210/  71ms stddev (last 3)<ESC>8<ESC>[0;31m!<ESC>[0m<ESC>7
 <ESC>[2K 2/  6 (33%) lost;   12/  86/ 210ms; last:   80ms
-<ESC>[2K 2/  4 (50%) lost;   80/ 145/ 210/  65ms (last 2)<ESC>8
+<ESC>[2K 2/  4 (50%) lost;   80/ 145/ 210/  65ms stddev (last 2)<ESC>8

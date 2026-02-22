@@ -23,6 +23,7 @@ surge-ping = "0.8.4"
 [target.'cfg(target_os = "windows")'.dependencies]
 ctrlc = "3.5.2"
 ping-async = "1.0.2"
+windows-sys = { version = "0.59.0", features = ["Win32_Foundation", "Win32_System_Console"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
