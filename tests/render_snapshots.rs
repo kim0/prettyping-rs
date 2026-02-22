@@ -169,13 +169,21 @@ fn plain_unicode_snapshot_is_ascii_escaped() {
 
 fn assert_snapshot(name: &str, actual: &str) {
     let path = snapshot_path(name);
+    let actual_normalized = normalize_line_endings(actual);
 
     if std::env::var("UPDATE_SNAPSHOTS").ok().as_deref() == Some("1") {
-        fs::write(&path, actual).expect("snapshot write should succeed");
+        fs::write(&path, &actual_normalized).expect("snapshot write should succeed");
     }
 
     let expected = fs::read_to_string(&path).expect("snapshot file should exist");
-    assert_eq!(actual, expected, "snapshot mismatch: {}", path.display());
+    let expected_normalized = normalize_line_endings(&expected);
+
+    assert_eq!(
+        actual_normalized,
+        expected_normalized,
+        "snapshot mismatch: {}",
+        path.display()
+    );
 }
 
 fn snapshot_path(name: &str) -> PathBuf {
@@ -199,4 +207,8 @@ fn to_ascii_snapshot(input: &str) -> String {
     }
 
     out
+}
+
+fn normalize_line_endings(input: &str) -> String {
+    input.replace("\r\n", "\n")
 }
