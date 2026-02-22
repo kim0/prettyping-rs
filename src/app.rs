@@ -63,6 +63,8 @@ pub enum AppError {
     InvalidCount,
     #[error("duration overflow while scheduling probes")]
     ClockOverflow,
+    #[error("observer failed: {message}")]
+    Observer { message: String },
     #[error(transparent)]
     Engine(#[from] PingEngineError),
 }
@@ -82,6 +84,18 @@ pub fn run<E>(engine: &mut E, config: &AppConfig) -> Result<AppReport, AppError>
 where
     E: PingEngine,
 {
+    run_with_observer(engine, config, |_| Ok(()))
+}
+
+pub fn run_with_observer<E, F>(
+    engine: &mut E,
+    config: &AppConfig,
+    mut observer: F,
+) -> Result<AppReport, AppError>
+where
+    E: PingEngine,
+    F: FnMut(&AppEvent) -> Result<(), AppError>,
+{
     validate_config(config)?;
 
     let mut report = AppReport::default();
@@ -97,6 +111,7 @@ where
     schedule_due(
         engine,
         config,
+        &mut observer,
         &mut report,
         &mut sent_total,
         &mut next_seq,
@@ -125,16 +140,20 @@ where
                         let did_insert = replied.insert(seq);
                         if did_insert {
                             report.replies = report.replies.saturating_add(1);
-                            report.events.push(AppEvent::ProbeReply {
-                                seq,
-                                sent_at: inflight.sent_at,
-                                received_at: timed_event.at,
-                                rtt_ms: duration_to_ms(
-                                    timed_event.at.saturating_sub(inflight.sent_at),
-                                ),
-                                duplicate: false,
-                                late: false,
-                            });
+                            record_event(
+                                &mut report,
+                                AppEvent::ProbeReply {
+                                    seq,
+                                    sent_at: inflight.sent_at,
+                                    received_at: timed_event.at,
+                                    rtt_ms: duration_to_ms(
+                                        timed_event.at.saturating_sub(inflight.sent_at),
+                                    ),
+                                    duplicate: false,
+                                    late: false,
+                                },
+                                &mut observer,
+                            )?;
                         }
                     } else if let Some(meta) = sent_meta.get(&seq) {
                         let duplicate = replied.contains(&seq);
@@ -149,21 +168,27 @@ where
                             report.late_replies = report.late_replies.saturating_add(1);
                         }
 
-                        report.events.push(AppEvent::ProbeReply {
-                            seq,
-                            sent_at: meta.sent_at,
-                            received_at: timed_event.at,
-                            rtt_ms: duration_to_ms(timed_event.at.saturating_sub(meta.sent_at)),
-                            duplicate,
-                            late,
-                        });
+                        record_event(
+                            &mut report,
+                            AppEvent::ProbeReply {
+                                seq,
+                                sent_at: meta.sent_at,
+                                received_at: timed_event.at,
+                                rtt_ms: duration_to_ms(timed_event.at.saturating_sub(meta.sent_at)),
+                                duplicate,
+                                late,
+                            },
+                            &mut observer,
+                        )?;
                     }
                 }
                 PingEvent::Interrupt => {
                     report.interrupted = true;
-                    report
-                        .events
-                        .push(AppEvent::Interrupted { at: timed_event.at });
+                    record_event(
+                        &mut report,
+                        AppEvent::Interrupted { at: timed_event.at },
+                        &mut observer,
+                    )?;
                     break;
                 }
             }
@@ -176,6 +201,7 @@ where
         schedule_due(
             engine,
             config,
+            &mut observer,
             &mut report,
             &mut sent_total,
             &mut next_seq,
@@ -226,6 +252,7 @@ fn next_deadline(
 fn schedule_due<E>(
     engine: &mut E,
     config: &AppConfig,
+    observer: &mut impl FnMut(&AppEvent) -> Result<(), AppError>,
     report: &mut AppReport,
     sent_total: &mut u64,
     next_seq: &mut SequenceNumber,
@@ -248,11 +275,15 @@ where
         if let Some(inflight) = in_flight.remove(&seq) {
             let _ = timed_out.insert(seq);
             report.timeouts = report.timeouts.saturating_add(1);
-            report.events.push(AppEvent::ProbeTimeout {
-                seq,
-                sent_at: inflight.sent_at,
-                deadline: inflight.deadline,
-            });
+            record_event(
+                report,
+                AppEvent::ProbeTimeout {
+                    seq,
+                    sent_at: inflight.sent_at,
+                    deadline: inflight.deadline,
+                },
+                observer,
+            )?;
         }
     }
 
@@ -275,13 +306,23 @@ where
         in_flight.insert(seq, InFlight { sent_at, deadline });
         sent_meta.insert(seq, SentMeta { sent_at });
         report.sent = report.sent.saturating_add(1);
-        report.events.push(AppEvent::ProbeSent { seq, at: sent_at });
+        record_event(report, AppEvent::ProbeSent { seq, at: sent_at }, observer)?;
 
         *sent_total = sent_total.saturating_add(1);
         *next_seq = next_seq.saturating_add(1);
         *next_send_at = add_duration(*next_send_at, config.interval)?;
     }
 
+    Ok(())
+}
+
+fn record_event(
+    report: &mut AppReport,
+    event: AppEvent,
+    observer: &mut impl FnMut(&AppEvent) -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    observer(&event)?;
+    report.events.push(event);
     Ok(())
 }
 

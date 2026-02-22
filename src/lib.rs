@@ -10,6 +10,7 @@ pub mod engine;
 pub mod net;
 pub mod render;
 pub mod ring_buffer;
+pub mod runtime;
 pub mod stats;
 
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(1);
@@ -23,12 +24,12 @@ pub fn run() -> Result<(), clap::Error> {
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        run_with_unix_backend(app_config)
+        run_with_unix_backend(&config, app_config)
     }
 
     #[cfg(target_os = "windows")]
     {
-        run_with_windows_backend(app_config)
+        run_with_windows_backend(&config, app_config)
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
@@ -124,7 +125,10 @@ fn runtime_error(message: impl Into<String>) -> clap::Error {
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn run_with_unix_backend(app_config: app::AppConfig) -> Result<(), clap::Error> {
+fn run_with_unix_backend(
+    config: &config::Config,
+    app_config: app::AppConfig,
+) -> Result<(), clap::Error> {
     let mut engine =
         engine::unix_surge::UnixSurgeEngine::new(engine::unix_surge::UnixSurgeEngineOptions {
             target: app_config.target,
@@ -133,13 +137,16 @@ fn run_with_unix_backend(app_config: app::AppConfig) -> Result<(), clap::Error> 
         })
         .map_err(|err| runtime_error(err.to_string()))?;
 
-    app::run(&mut engine, &app_config)
+    runtime::run_with_runtime(&mut engine, &app_config, config)
         .map(|_| ())
         .map_err(|err| runtime_error(format!("ping runtime failed: {err}")))
 }
 
 #[cfg(target_os = "windows")]
-fn run_with_windows_backend(app_config: app::AppConfig) -> Result<(), clap::Error> {
+fn run_with_windows_backend(
+    config: &config::Config,
+    app_config: app::AppConfig,
+) -> Result<(), clap::Error> {
     let mut engine = engine::windows_ping_async::WindowsPingAsyncEngine::new(
         engine::windows_ping_async::WindowsPingAsyncEngineOptions {
             target: app_config.target,
@@ -149,7 +156,7 @@ fn run_with_windows_backend(app_config: app::AppConfig) -> Result<(), clap::Erro
     )
     .map_err(|err| runtime_error(err.to_string()))?;
 
-    app::run(&mut engine, &app_config)
+    runtime::run_with_runtime(&mut engine, &app_config, config)
         .map(|_| ())
         .map_err(|err| runtime_error(format!("ping runtime failed: {err}")))
 }

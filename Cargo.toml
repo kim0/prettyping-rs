@@ -12,13 +12,16 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.41", features = ["derive", "env"] }
+terminal_size = "0.4.3"
 thiserror = "2.0.12"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "signal", "time", "net"] }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+signal-hook = "0.3.18"
 surge-ping = "0.8.4"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+ctrlc = "3.5.1"
 ping-async = "1.0.2"
 
 [dev-dependencies]
