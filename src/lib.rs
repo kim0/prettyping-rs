@@ -8,6 +8,9 @@ pub mod cli;
 pub mod config;
 pub mod engine;
 pub mod net;
+pub mod render;
+pub mod ring_buffer;
+pub mod stats;
 
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);

@@ -5,7 +5,7 @@ use clap::{ArgAction, CommandFactory, Parser};
 
 use crate::config::{self, Config, ConfigInput, DEFAULT_LAST};
 
-const CLI_AFTER_HELP: &str = "Compatibility notes:\n  • Removed legacy flags: --awkbin, --pingbin (hard error).\n  • Unsupported legacy flags: -f, -R, -q, -a (hard error).\n  • Legacy -v is accepted and ignored for compatibility.";
+const CLI_AFTER_HELP: &str = "Compatibility notes:\n  - Removed legacy flags: --awkbin, --pingbin (hard error).\n  - Unsupported legacy flags: -f, -R, -q, -a (hard error).\n  - Legacy -v is accepted and ignored for compatibility.";
 
 #[derive(Debug, Parser)]
 #[command(
