@@ -7,7 +7,7 @@
 pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
     use std::io;
 
-    use windows_sys::Win32::Foundation::{GetLastError, HANDLE, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Console::{
         GetConsoleMode, GetStdHandle, SetConsoleMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
         STD_OUTPUT_HANDLE,
@@ -15,7 +15,7 @@ pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
 
     unsafe {
         let handle: HANDLE = GetStdHandle(STD_OUTPUT_HANDLE);
-        if handle == 0 || handle == INVALID_HANDLE_VALUE {
+        if handle.is_null() || handle == INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
         }
 
@@ -31,8 +31,6 @@ pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
         let new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         if new_mode != mode {
             if SetConsoleMode(handle, new_mode) == 0 {
-                // Preserve last error.
-                let _code = GetLastError();
                 return Err(io::Error::last_os_error());
             }
         }
