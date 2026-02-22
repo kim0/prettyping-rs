@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use thiserror::Error;
@@ -38,7 +39,7 @@ pub struct UnixSurgeEngine {
     now: EngineTime,
     started_at: Instant,
     runtime: tokio::runtime::Runtime,
-    client: surge_ping::Client,
+    client: Arc<surge_ping::Client>,
     identifier: surge_ping::PingIdentifier,
     inbox_tx: Sender<BackendMessage>,
     inbox_rx: Receiver<BackendMessage>,
@@ -68,10 +69,14 @@ impl UnixSurgeEngine {
         }
         let config = config_builder.build();
 
-        let client =
-            surge_ping::Client::new(&config).map_err(|err| UnixSurgeError::InitFailed {
+        // surge-ping requires a Tokio runtime context for initialization.
+        let _tokio_guard = runtime.enter();
+
+        let client = Arc::new(surge_ping::Client::new(&config).map_err(|err| {
+            UnixSurgeError::InitFailed {
                 message: format_io_error_with_guidance("could not open ICMP socket", &err),
-            })?;
+            }
+        })?);
 
         let identifier = default_ping_identifier();
         let (inbox_tx, inbox_rx) = mpsc::channel();
