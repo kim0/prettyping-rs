@@ -9,6 +9,10 @@ license = "MIT"
 name = "prettyping_rs"
 path = "src/lib.rs"
 
+[[bin]]
+name = "prettyping"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive", "env"] }

@@ -1,51 +1,95 @@
 # prettyping-rs
 
-Rust port of prettyping with a pure Rust ping engine.
+A beautiful, real-time ping graph for your terminal — built in pure Rust.
 
-## Current Status
+`prettyping` helps you spot latency spikes and packet loss at a glance, without the noisy wall of classic ping output.
 
-Milestones **M0 through M7** are implemented:
-- M0-M4: project baseline, CLI contract, runtime contracts, Unix/Windows backends.
-- M5: stats/rendering parity foundations.
-- M6: signal/shutdown/exit-code polish.
-- M7: parity + release-readiness documentation.
+This project is inspired by the excellent [prettyping](https://github.com/denilsonsa/prettyping.git) shell script.
 
-## Locked Scope
+<p align="center">
+  <img src="docs/images/prettyping-rust-screenshot.png" alt="prettyping terminal screenshot" width="880" />
+</p>
 
-- Pure Rust ping engine (no external `ping` process).
-- No `httping` support.
-- Integer RTT behavior (truncate to integer ms for display/stats).
-- Removed legacy passthrough flags: `--awkbin`, `--pingbin`.
-- Platforms: Linux + macOS first-class, Windows best-effort.
-- No JSON output mode.
+## Why prettyping?
 
-## Backend Direction
+- **Instant visual signal**: see connection quality trends in one line
+- **Pure Rust runtime**: no `ping | awk` subprocess pipeline
+- **Built for long runs**: clean terminal mode and log-friendly plain mode
+- **Cross-platform direction**: first-class Linux/macOS, Windows best-effort
 
-- Linux/macOS: `surge-ping`
-- Windows: `ping-async`
+## Features
 
-## Platform Permission Notes
+- Unicode or ASCII graph output
+- Optional color and multi-color latency buckets
+- Global stats and recent-window stats
+- Terminal auto-detection with manual override
+- Native flags for count, interval, timeout, payload size, TTL, IPv4/IPv6
 
-ICMP permissions depend on OS and environment:
+## Quick start
 
-- **Linux:** unprivileged ICMP usually works only if `net.ipv4.ping_group_range` allows the current group.
-- **macOS:** unprivileged ICMP datagram sockets often work.
-- **Windows:** best-effort via ICMP APIs; environment and policy can still block traffic. Payload size (-s) is best-effort and may not be honored by the backend.
-
-Even on supported OSes, hardened/sandboxed environments may fail. The app will provide actionable diagnostics when permission/network setup blocks ping.
-
-## Docs
-
-- Parity matrix: `docs/parity-matrix.md`
-- Release readiness (unsupported features, caveats, troubleshooting, smoke + tags): `docs/release-readiness.md`
-
-## Development Checks
-
-Run from `prettyping-rs/`:
+### Install from source
 
 ```bash
-cargo check
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
+cargo install --path .
 ```
+
+Repo/package name: `prettyping-rs`  
+Installed command: `prettyping`
+
+### Run
+
+```bash
+prettyping 1.1.1.1
+```
+
+### More examples
+
+```bash
+# Stop after 10 probes
+prettyping -c 10 1.1.1.1
+
+# Faster probing
+prettyping -i 0.2 -W 1 8.8.8.8
+
+# Force plain output (good for logs/pipes)
+prettyping --noterminal --nounicode --nocolor -c 20 example.com
+
+# Force IPv6
+prettyping -6 example.com
+```
+
+## Platform support
+
+| Platform | Status | Backend |
+| --- | --- | --- |
+| Linux | First-class | `surge-ping` |
+| macOS | First-class | `surge-ping` |
+| Windows | Best-effort | `ping-async` |
+
+> ICMP permissions can be restricted by OS/network policy. See [Troubleshooting](docs/troubleshooting.md).
+
+## Documentation
+
+- [Installation](docs/installation.md)
+- [Usage guide](docs/usage.md)
+- [CLI reference](docs/cli-reference.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Developer guide](docs/developer-guide.md)
+
+## Compatibility notes
+
+- Removed legacy passthrough flags: `--awkbin`, `--pingbin` (hard error)
+- Unsupported legacy flags: `-f`, `-R`, `-q`, `-a` (hard error)
+- Legacy `-v` is accepted and ignored
+- No `httping` mode
+- No JSON output mode
+
+## Exit codes
+
+- `0` success (including controlled interrupt)
+- `1` runtime/backend/network failure
+- `2` usage/config error
+
+## License
+
+MIT

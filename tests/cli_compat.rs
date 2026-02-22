@@ -6,7 +6,7 @@ use prettyping_rs::config::AddressFamily;
 #[test]
 fn defaults_match_prettyping_behavior() {
     let cfg =
-        parse_config_from_args(["prettyping-rs", "example.com"]).expect("parse should succeed");
+        parse_config_from_args(["prettyping", "example.com"]).expect("parse should succeed");
 
     assert_eq!(cfg.host, "example.com");
     assert!(cfg.color);
@@ -23,7 +23,7 @@ fn defaults_match_prettyping_behavior() {
 #[test]
 fn maps_kept_flags_and_native_ping_flags() {
     let cfg = parse_config_from_args([
-        "prettyping-rs",
+        "prettyping",
         "-nocolor",
         "--nomulticolor",
         "--nounicode",
@@ -79,7 +79,7 @@ fn maps_kept_flags_and_native_ping_flags() {
 #[test]
 fn boolean_flag_pairs_use_last_wins_precedence() {
     let cfg = parse_config_from_args([
-        "prettyping-rs",
+        "prettyping",
         "--nocolor",
         "--color",
         "--legend",
@@ -92,7 +92,7 @@ fn boolean_flag_pairs_use_last_wins_precedence() {
     assert!(!cfg.legend, "last --nolegend should win over --legend");
 
     let cfg = parse_config_from_args([
-        "prettyping-rs",
+        "prettyping",
         "--color",
         "--nocolor",
         "--noterminal",
@@ -107,13 +107,13 @@ fn boolean_flag_pairs_use_last_wins_precedence() {
 
 #[test]
 fn removed_legacy_flags_return_usage_error() {
-    let err = parse_config_from_args(["prettyping-rs", "--awkbin", "awk", "example.com"])
+    let err = parse_config_from_args(["prettyping", "--awkbin", "awk", "example.com"])
         .expect_err("--awkbin must be rejected");
 
     assert_eq!(err.exit_code(), 2);
     assert!(err.to_string().contains("--awkbin was removed"));
 
-    let err = parse_config_from_args(["prettyping-rs", "--pingbin", "ping", "example.com"])
+    let err = parse_config_from_args(["prettyping", "--pingbin", "ping", "example.com"])
         .expect_err("--pingbin must be rejected");
 
     assert_eq!(err.exit_code(), 2);
@@ -124,7 +124,7 @@ fn removed_legacy_flags_return_usage_error() {
 fn unsupported_legacy_flags_are_rejected() {
     for flag in ["-f", "-R", "-q", "-a"] {
         let err =
-            parse_config_from_args(["prettyping-rs", flag, "example.com"]).expect_err("must fail");
+            parse_config_from_args(["prettyping", flag, "example.com"]).expect_err("must fail");
         assert_eq!(err.exit_code(), 2, "flag {flag} should exit with code 2");
         assert!(
             err.to_string().contains("unsupported legacy flag"),
@@ -135,7 +135,7 @@ fn unsupported_legacy_flags_are_rejected() {
 
 #[test]
 fn legacy_verbose_flag_is_accepted_and_ignored() {
-    let cfg = parse_config_from_args(["prettyping-rs", "-v", "example.com"])
+    let cfg = parse_config_from_args(["prettyping", "-v", "example.com"])
         .expect("-v should be accepted");
     assert_eq!(cfg.host, "example.com");
 }
@@ -143,7 +143,7 @@ fn legacy_verbose_flag_is_accepted_and_ignored() {
 #[test]
 fn rejects_invalid_rtt_range() {
     let err = parse_config_from_args([
-        "prettyping-rs",
+        "prettyping",
         "--rttmin",
         "50",
         "--rttmax",
@@ -160,19 +160,19 @@ fn rejects_invalid_rtt_range() {
 
 #[test]
 fn rejects_family_conflicts() {
-    let err = parse_config_from_args(["prettyping-rs", "-4", "-6", "example.com"])
+    let err = parse_config_from_args(["prettyping", "-4", "-6", "example.com"])
         .expect_err("must fail");
     assert_eq!(err.exit_code(), 2);
     assert!(err.to_string().contains("cannot use -4 and -6 together"));
 
-    let err = parse_config_from_args(["prettyping-rs", "-4", "::1"]).expect_err("must fail");
+    let err = parse_config_from_args(["prettyping", "-4", "::1"]).expect_err("must fail");
     assert_eq!(err.exit_code(), 2);
     assert!(err.to_string().contains("host address family conflicts"));
 }
 
 #[test]
 fn help_mentions_removed_and_unsupported_flags() {
-    let err = parse_config_from_args(["prettyping-rs", "--help"]).expect_err("help exits early");
+    let err = parse_config_from_args(["prettyping", "--help"]).expect_err("help exits early");
     let help = err.to_string();
 
     assert_eq!(err.exit_code(), 0);
@@ -183,7 +183,7 @@ fn help_mentions_removed_and_unsupported_flags() {
 
 #[test]
 fn process_usage_errors_exit_with_code_2() {
-    let bin = env!("CARGO_BIN_EXE_prettyping-rs");
+    let bin = env!("CARGO_BIN_EXE_prettyping");
 
     let awkbin_output = Command::new(bin)
         .arg("--awkbin")
