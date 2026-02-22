@@ -77,6 +77,35 @@ fn maps_kept_flags_and_native_ping_flags() {
 }
 
 #[test]
+fn boolean_flag_pairs_use_last_wins_precedence() {
+    let cfg = parse_config_from_args([
+        "prettyping-rs",
+        "--nocolor",
+        "--color",
+        "--legend",
+        "--nolegend",
+        "example.com",
+    ])
+    .expect("parse should succeed");
+
+    assert!(cfg.color, "last --color should win over --nocolor");
+    assert!(!cfg.legend, "last --nolegend should win over --legend");
+
+    let cfg = parse_config_from_args([
+        "prettyping-rs",
+        "--color",
+        "--nocolor",
+        "--noterminal",
+        "--terminal",
+        "example.com",
+    ])
+    .expect("parse should succeed");
+
+    assert!(!cfg.color, "last --nocolor should win over --color");
+    assert_eq!(cfg.terminal, Some(true));
+}
+
+#[test]
 fn removed_legacy_flags_return_usage_error() {
     let err = parse_config_from_args(["prettyping-rs", "--awkbin", "awk", "example.com"])
         .expect_err("--awkbin must be rejected");

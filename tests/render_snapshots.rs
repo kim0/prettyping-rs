@@ -9,6 +9,10 @@ use prettyping_rs::render::RenderConfig;
 
 fn base_events() -> Vec<AppEvent> {
     vec![
+        AppEvent::ProbeSent {
+            seq: 1,
+            at: Duration::ZERO,
+        },
         AppEvent::ProbeReply {
             seq: 1,
             sent_at: Duration::ZERO,
@@ -16,6 +20,10 @@ fn base_events() -> Vec<AppEvent> {
             rtt_ms: 12,
             duplicate: false,
             late: false,
+        },
+        AppEvent::ProbeSent {
+            seq: 2,
+            at: Duration::from_millis(1_000),
         },
         AppEvent::ProbeReply {
             seq: 2,
@@ -25,10 +33,18 @@ fn base_events() -> Vec<AppEvent> {
             duplicate: false,
             late: false,
         },
+        AppEvent::ProbeSent {
+            seq: 3,
+            at: Duration::from_millis(2_000),
+        },
         AppEvent::ProbeTimeout {
             seq: 3,
             sent_at: Duration::from_millis(2_000),
             deadline: Duration::from_millis(2_900),
+        },
+        AppEvent::ProbeSent {
+            seq: 4,
+            at: Duration::from_millis(3_000),
         },
         AppEvent::ProbeReply {
             seq: 4,
@@ -38,6 +54,10 @@ fn base_events() -> Vec<AppEvent> {
             duplicate: false,
             late: false,
         },
+        AppEvent::ProbeSent {
+            seq: 5,
+            at: Duration::from_millis(4_000),
+        },
         AppEvent::ProbeReply {
             seq: 5,
             sent_at: Duration::from_millis(4_000),
@@ -45,6 +65,10 @@ fn base_events() -> Vec<AppEvent> {
             rtt_ms: 80,
             duplicate: false,
             late: false,
+        },
+        AppEvent::ProbeSent {
+            seq: 6,
+            at: Duration::from_millis(5_000),
         },
         AppEvent::ProbeTimeout {
             seq: 6,
@@ -113,7 +137,7 @@ fn terminal_narrow_resize_snapshot() {
     let events = base_events();
 
     for (index, event) in events.iter().enumerate() {
-        if index == 3 {
+        if index == 7 {
             renderer.update_size(Some(16), Some(8));
         }
         renderer.render_event(event);

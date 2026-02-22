@@ -74,3 +74,21 @@ fn matches_family(ip: IpAddr, family: AddressFamily) -> bool {
         AddressFamily::Ipv6 => ip.is_ipv6(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_once, AddressFamily, ResolveError};
+
+    #[test]
+    fn literal_ipv6_is_rejected_when_ipv4_is_requested() {
+        let err = resolve_once("::1", AddressFamily::Ipv4).expect_err("must reject v6 for -4");
+        assert!(matches!(err, ResolveError::NoAddressForFamily { .. }));
+    }
+
+    #[test]
+    fn literal_ipv4_is_rejected_when_ipv6_is_requested() {
+        let err =
+            resolve_once("127.0.0.1", AddressFamily::Ipv6).expect_err("must reject v4 for -6");
+        assert!(matches!(err, ResolveError::NoAddressForFamily { .. }));
+    }
+}

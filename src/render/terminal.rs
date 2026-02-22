@@ -91,6 +91,14 @@ impl TerminalRenderer {
     pub fn finish(&mut self) {
         if self.curr_col > 0 {
             self.out.push('\n');
+
+            // When stats overlay lines are reserved below the graph line,
+            // one newline lands on the first overlay line. Move below the
+            // full overlay so the shell prompt appears on a clean line.
+            for _ in 0..self.reserved_lines {
+                self.out.push('\n');
+            }
+
             self.curr_col = 0;
         }
     }

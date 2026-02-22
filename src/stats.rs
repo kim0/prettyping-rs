@@ -38,6 +38,7 @@ pub struct StatsSnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stats {
+    total_sent: u64,
     total_received: u64,
     total_lost: u64,
     total_rtt_sum: u64,
@@ -58,6 +59,7 @@ impl Stats {
     pub fn new(last: u32) -> Self {
         let capacity = usize::try_from(last).unwrap_or(usize::MAX);
         Self {
+            total_sent: 0,
             total_received: 0,
             total_lost: 0,
             total_rtt_sum: 0,
@@ -70,10 +72,19 @@ impl Stats {
 
     pub fn apply(&mut self, event: &AppEvent) {
         match event {
+            AppEvent::ProbeSent { .. } => {
+                self.total_sent = self.total_sent.saturating_add(1);
+            }
             AppEvent::ProbeReply {
-                rtt_ms, duplicate, ..
+                rtt_ms,
+                duplicate,
+                late,
+                ..
             } => {
-                if *duplicate {
+                // Duplicate replies and late replies should not mutate statistics.
+                // Late replies already missed the configured timeout and are tracked
+                // separately at the app-report layer.
+                if *duplicate || *late {
                     return;
                 }
                 let value = u32::try_from(*rtt_ms).unwrap_or(u32::MAX);
@@ -110,10 +121,7 @@ impl Stats {
 
     #[must_use]
     pub fn global_snapshot(&self) -> GlobalStatsSnapshot {
-        let loss = loss_stats(
-            self.total_lost,
-            self.total_lost.saturating_add(self.total_received),
-        );
+        let loss = loss_stats(self.total_lost, self.total_sent);
         let (min_ms, avg_ms, max_ms, stddev_ms) = if self.total_received == 0 {
             (0, 0, 0, 0)
         } else {
@@ -277,6 +285,11 @@ mod tests {
     fn tracks_integer_stats_with_recent_window() {
         let mut stats = Stats::new(3);
 
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 1,
+            at: Duration::ZERO,
+        });
+
         stats.apply(&AppEvent::ProbeReply {
             seq: 1,
             sent_at: Duration::ZERO,
@@ -284,6 +297,10 @@ mod tests {
             rtt_ms: 9,
             duplicate: false,
             late: false,
+        });
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 2,
+            at: Duration::ZERO,
         });
         stats.apply(&AppEvent::ProbeReply {
             seq: 2,
@@ -293,10 +310,18 @@ mod tests {
             duplicate: false,
             late: false,
         });
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 3,
+            at: Duration::ZERO,
+        });
         stats.apply(&AppEvent::ProbeTimeout {
             seq: 3,
             sent_at: Duration::ZERO,
             deadline: Duration::from_millis(100),
+        });
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 4,
+            at: Duration::ZERO,
         });
         stats.apply(&AppEvent::ProbeReply {
             seq: 4,
@@ -331,6 +356,11 @@ mod tests {
     fn duplicate_replies_do_not_skew_stats() {
         let mut stats = Stats::new(5);
 
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 1,
+            at: Duration::ZERO,
+        });
+
         stats.apply(&AppEvent::ProbeReply {
             seq: 1,
             sent_at: Duration::ZERO,
@@ -350,8 +380,40 @@ mod tests {
         });
 
         let global = stats.global_snapshot();
+        assert_eq!(global.loss.total, 1);
+        assert_eq!(global.loss.lost, 0);
+        assert_eq!(global.loss.percent, 0);
         assert_eq!(global.rtt.count, 1);
         assert_eq!(global.rtt.avg_ms, 10);
         assert_eq!(global.last_rtt_ms, 10);
+    }
+
+    #[test]
+    fn late_replies_do_not_change_global_loss_denominator() {
+        let mut stats = Stats::new(5);
+
+        stats.apply(&AppEvent::ProbeSent {
+            seq: 1,
+            at: Duration::ZERO,
+        });
+        stats.apply(&AppEvent::ProbeTimeout {
+            seq: 1,
+            sent_at: Duration::ZERO,
+            deadline: Duration::from_millis(1_000),
+        });
+        stats.apply(&AppEvent::ProbeReply {
+            seq: 1,
+            sent_at: Duration::ZERO,
+            received_at: Duration::from_millis(1_500),
+            rtt_ms: 1_500,
+            duplicate: false,
+            late: true,
+        });
+
+        let global = stats.global_snapshot();
+        assert_eq!(global.loss.lost, 1);
+        assert_eq!(global.loss.total, 1);
+        assert_eq!(global.loss.percent, 100);
+        assert_eq!(global.rtt.count, 0);
     }
 }

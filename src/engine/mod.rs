@@ -82,7 +82,11 @@ pub trait PingEngine {
     ///
     /// Implementations must keep time monotonic. If there is an event at or before
     /// `deadline`, return all events for that exact timestamp and advance `now()` to
-    /// that timestamp. If no event exists before `deadline`, advance to `deadline` and
-    /// return an empty vector.
+    /// that timestamp. If no event exists before `deadline`, advance to at least
+    /// `deadline` and return an empty vector.
+    ///
+    /// Real-time backends may need to catch up after a process pause/sleep. If
+    /// `deadline` is already behind the backend's wall-clock elapsed time, they may
+    /// advance to "now" instead of stalling behind real time.
     fn poll_until(&mut self, deadline: EngineTime) -> Result<Vec<TimedEvent>, PingEngineError>;
 }

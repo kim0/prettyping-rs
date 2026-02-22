@@ -7,7 +7,7 @@ use crate::config::{self, Config, ConfigInput, DEFAULT_LAST};
 
 const CLI_AFTER_HELP: &str = "Compatibility notes:\n  - Removed legacy flags: --awkbin, --pingbin (hard error).\n  - Unsupported legacy flags: -f, -R, -q, -a (hard error).\n  - Legacy -v is accepted and ignored for compatibility.";
 
-const CLI_HELP_TEXT: &str = "Usage: prettyping-rs [prettyping parameters] <host>\n\nThis is a Rust port of prettyping. It prints each ping response as a compact\ncharacter graph, with optional color and stats lines.\n\nprettyping parameters:\n  --[no]color        Enable/disable color output. (default: enabled)\n  --[no]multicolor   Enable/disable multi-color output. Has no effect if\n                       color or unicode is disabled. (default: enabled)\n  --[no]unicode      Enable/disable unicode characters. (default: enabled)\n  --[no]legend       Enable/disable the latency legend. (default: enabled)\n  --[no]globalstats  Enable/disable the global statistics line. (default: enabled)\n  --[no]recentstats  Enable/disable the last n statistics line. (default: enabled)\n  --[no]terminal     Force the output designed for a terminal. (default: auto)\n  --last <n>         Use the last n pings at the statistics line. (default: 60)\n  --columns <n>      Override auto-detection of terminal dimensions.\n  --lines <n>        Override auto-detection of terminal dimensions.\n  --rttmin <n>       Minimum RTT represented in the graph. (default: auto)\n  --rttmax <n>       Maximum RTT represented in the graph. (default: auto)\n\nping parameters handled by prettyping-rs:\n  -4, --ipv4         Use IPv4 only.\n  -6, --ipv6         Use IPv6 only.\n  -c, --count <n>    Stop after sending n probes.\n  -i, --interval <s> Interval between probes in seconds.\n  -W, --timeout <s>  Per-probe timeout in seconds.\n  -s, --size <n>     Payload size in bytes.\n  -t, --ttl <n>      IP time-to-live (hop limit).\n\n";
+const CLI_HELP_TEXT: &str = "Usage: prettyping-rs [prettyping parameters] <host>\n\nThis is a Rust port of prettyping. It prints each ping response as a compact\ncharacter graph, with optional color and stats lines.\n\nprettyping parameters:\n  --[no]color        Enable/disable color output. (default: enabled)\n  --[no]multicolor   Enable/disable multi-color output. Has no effect if\n                       color is disabled. (default: enabled)\n  --[no]unicode      Enable/disable unicode characters. (default: enabled)\n  --[no]legend       Enable/disable the latency legend. (default: enabled)\n  --[no]globalstats  Enable/disable the global statistics line. (default: enabled)\n  --[no]recentstats  Enable/disable the last n statistics line. (default: enabled)\n  --[no]terminal     Force the output designed for a terminal. (default: auto)\n  --last <n>         Use the last n pings at the statistics line. (default: 60)\n  --columns <n>      Override auto-detection of terminal dimensions.\n  --lines <n>        Override auto-detection of terminal dimensions.\n  --rttmin <n>       Minimum RTT represented in the graph. (default: auto)\n  --rttmax <n>       Maximum RTT represented in the graph. (default: auto)\n\nping parameters handled by prettyping-rs:\n  -4, --ipv4         Use IPv4 only.\n  -6, --ipv6         Use IPv6 only.\n  -c, --count <n>    Stop after sending n probes.\n  -i, --interval <s> Interval between probes in seconds.\n  -W, --timeout <s>  Per-probe timeout in seconds.\n  -s, --size <n>     Payload size in bytes.\n  -t, --ttl <n>      IP time-to-live (hop limit).\n\n";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -107,6 +107,12 @@ where
     if wants_help(&normalized) {
         return Err(help_error());
     }
+    let color = parse_toggle_override(&normalized, "--color", "--nocolor", true);
+    let multicolor = parse_toggle_override(&normalized, "--multicolor", "--nomulticolor", true);
+    let unicode = parse_toggle_override(&normalized, "--unicode", "--nounicode", true);
+    let legend = parse_toggle_override(&normalized, "--legend", "--nolegend", true);
+    let globalstats = parse_toggle_override(&normalized, "--globalstats", "--noglobalstats", true);
+    let recentstats = parse_toggle_override(&normalized, "--recentstats", "--norecentstats", true);
     let terminal_override = parse_terminal_override(&normalized);
 
     let raw = RawCliArgs::try_parse_from(normalized)?;
@@ -139,12 +145,12 @@ where
 
     let input = ConfigInput {
         host: raw.host,
-        color: !raw.nocolor || raw.color,
-        multicolor: !raw.nomulticolor || raw.multicolor,
-        unicode: !raw.nounicode || raw.unicode,
-        legend: !raw.nolegend || raw.legend,
-        globalstats: !raw.noglobalstats || raw.globalstats,
-        recentstats: !raw.norecentstats || raw.recentstats,
+        color,
+        multicolor,
+        unicode,
+        legend,
+        globalstats,
+        recentstats,
         terminal: terminal_override,
         last: raw.last,
         columns: raw.columns,
@@ -185,10 +191,27 @@ fn help_error() -> clap::Error {
 }
 
 fn parse_terminal_override(args: &[OsString]) -> Option<bool> {
+    parse_toggle_override_optional(args, "--terminal", "--noterminal")
+}
+
+fn parse_toggle_override(
+    args: &[OsString],
+    enabled_flag: &str,
+    disabled_flag: &str,
+    default: bool,
+) -> bool {
+    parse_toggle_override_optional(args, enabled_flag, disabled_flag).unwrap_or(default)
+}
+
+fn parse_toggle_override_optional(
+    args: &[OsString],
+    enabled_flag: &str,
+    disabled_flag: &str,
+) -> Option<bool> {
     args.iter().skip(1).fold(None, |current, arg| {
-        if arg == "--terminal" {
+        if arg == enabled_flag {
             Some(true)
-        } else if arg == "--noterminal" {
+        } else if arg == disabled_flag {
             Some(false)
         } else {
             current

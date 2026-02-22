@@ -532,6 +532,10 @@ mod tests {
 
         let text = String::from_utf8(output).expect("output should be utf8");
         assert!(text.ends_with("\x1b[0m\n"));
+        assert!(
+            text.ends_with("\n\n\n\x1b[0m\n"),
+            "terminal finish should move below reserved stats lines before final reset"
+        );
     }
 
     #[test]

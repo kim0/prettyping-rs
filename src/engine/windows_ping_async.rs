@@ -187,7 +187,6 @@ impl PingEngine for WindowsPingAsyncEngine {
         let requestor = self.requestor.clone();
         let inbox = self.inbox_tx.clone();
         let started_at = self.started_at;
-        let target = self.target;
         let payload_size = request.payload_size;
         let requested_seq = request.seq;
 
@@ -206,14 +205,12 @@ impl PingEngine for WindowsPingAsyncEngine {
                         };
                         let _ = inbox.send(BackendMessage::Reply(timed_event));
                     }
-                    IcmpEchoStatus::TimedOut => {}
-                    status @ (IcmpEchoStatus::Unreachable | IcmpEchoStatus::Unknown) => {
-                        let _ = inbox.send(BackendMessage::Fatal(format_status_failure(
-                            status,
-                            target,
-                            requested_seq,
-                        )));
-                    }
+                    // Keep continuous ping behavior resilient on Windows.
+                    // Treat per-probe reachability statuses as timeout-like outcomes
+                    // instead of aborting the entire session.
+                    IcmpEchoStatus::TimedOut
+                    | IcmpEchoStatus::Unreachable
+                    | IcmpEchoStatus::Unknown => {}
                 },
                 Err(err) => {
                     let message = format_windows_io_error(
@@ -234,30 +231,32 @@ impl PingEngine for WindowsPingAsyncEngine {
         }
 
         loop {
+            let effective_deadline = deadline.max(self.started_at.elapsed());
+
             self.drain_inbox();
 
             if let Some(error) = self.pop_fatal_error() {
                 return Err(error);
             }
 
-            if let Some(events) = self.take_ready_events(deadline) {
+            if let Some(events) = self.take_ready_events(effective_deadline) {
                 return Ok(events);
             }
 
-            if deadline == self.now {
+            if effective_deadline == self.now {
                 return Ok(Vec::new());
             }
 
-            let remaining = self.real_time_remaining_until(deadline);
+            let remaining = self.real_time_remaining_until(effective_deadline);
             if remaining.is_zero() {
-                self.now = deadline;
+                self.now = effective_deadline;
                 return Ok(Vec::new());
             }
 
             match self.inbox_rx.recv_timeout(remaining) {
                 Ok(message) => self.handle_backend_message(message),
                 Err(RecvTimeoutError::Timeout) => {
-                    self.now = deadline;
+                    self.now = effective_deadline;
                     return Ok(Vec::new());
                 }
                 Err(RecvTimeoutError::Disconnected) => {
@@ -266,20 +265,6 @@ impl PingEngine for WindowsPingAsyncEngine {
                     });
                 }
             }
-        }
-    }
-}
-
-fn format_status_failure(status: IcmpEchoStatus, target: IpAddr, seq: SequenceNumber) -> String {
-    match status {
-        IcmpEchoStatus::Unreachable => format!(
-            "windows ICMP reported destination unreachable for seq {seq} ({target}).\nCheck route/VPN reachability and ensure Windows Firewall or endpoint security allows ICMP echo traffic."
-        ),
-        IcmpEchoStatus::Unknown => format!(
-            "windows ICMP reported an unknown failure for seq {seq} ({target}).\nTry pinging 127.0.0.1 to verify local ICMP stack, then inspect firewall/security policies and host network profile rules."
-        ),
-        IcmpEchoStatus::Success | IcmpEchoStatus::TimedOut => {
-            "windows backend status failure mapping invoked for non-failure status".to_string()
         }
     }
 }
@@ -352,11 +337,8 @@ fn windows_error_guidance(error: &io::Error) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use std::io;
-    use std::net::{IpAddr, Ipv4Addr};
 
-    use ping_async::IcmpEchoStatus;
-
-    use super::{format_status_failure, windows_error_guidance};
+    use super::windows_error_guidance;
 
     #[test]
     fn maps_access_denied_to_firewall_guidance() {
@@ -374,17 +356,5 @@ mod tests {
 
         assert!(message.contains("Network unreachable"));
         assert!(message.contains("route print"));
-    }
-
-    #[test]
-    fn unreachable_status_failure_is_actionable() {
-        let message = format_status_failure(
-            IcmpEchoStatus::Unreachable,
-            IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)),
-            7,
-        );
-
-        assert!(message.contains("destination unreachable"));
-        assert!(message.contains("Firewall"));
     }
 }

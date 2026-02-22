@@ -268,30 +268,32 @@ impl PingEngine for UnixSurgeEngine {
         }
 
         loop {
+            let effective_deadline = deadline.max(self.started_at.elapsed());
+
             self.drain_inbox();
 
             if let Some(error) = self.pop_fatal_error() {
                 return Err(error);
             }
 
-            if let Some(events) = self.take_ready_events(deadline) {
+            if let Some(events) = self.take_ready_events(effective_deadline) {
                 return Ok(events);
             }
 
-            if deadline == self.now {
+            if effective_deadline == self.now {
                 return Ok(Vec::new());
             }
 
-            let remaining = self.real_time_remaining_until(deadline);
+            let remaining = self.real_time_remaining_until(effective_deadline);
             if remaining.is_zero() {
-                self.now = deadline;
+                self.now = effective_deadline;
                 return Ok(Vec::new());
             }
 
             match self.inbox_rx.recv_timeout(remaining) {
                 Ok(message) => self.handle_backend_message(message),
                 Err(RecvTimeoutError::Timeout) => {
-                    self.now = deadline;
+                    self.now = effective_deadline;
                     return Ok(Vec::new());
                 }
                 Err(RecvTimeoutError::Disconnected) => {
