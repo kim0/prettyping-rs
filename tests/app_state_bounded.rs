@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
-use prettyping_rs::app::{run_with_observer, AppConfig};
+use prettyping_rs::app::{AppConfig, run_with_observer};
 use prettyping_rs::engine::mock::MockEngine;
 
 fn ms(value: u64) -> Duration {

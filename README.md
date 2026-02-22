@@ -1,5 +1,10 @@
 # prettyping-rs
 
+[![CI](https://github.com/kim0/prettyping-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kim0/prettyping-rs/actions/workflows/ci.yml)
+[![Release](https://github.com/kim0/prettyping-rs/actions/workflows/release.yml/badge.svg)](https://github.com/kim0/prettyping-rs/actions/workflows/release.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/kim0/prettyping-rs)](https://github.com/kim0/prettyping-rs/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/kim0/prettyping-rs)
+
 A beautiful, real-time ping graph for your terminal — built in pure Rust.
 
 `prettyping` helps you spot latency spikes and packet loss at a glance, without the noisy wall of classic ping output.

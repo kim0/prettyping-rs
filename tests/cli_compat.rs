@@ -152,9 +152,10 @@ fn rejects_invalid_rtt_range() {
     .expect_err("equal bounds must fail");
 
     assert_eq!(err.exit_code(), 2);
-    assert!(err
-        .to_string()
-        .contains("--rttmin must be strictly smaller than --rttmax"));
+    assert!(
+        err.to_string()
+            .contains("--rttmin must be strictly smaller than --rttmax")
+    );
 }
 
 #[test]

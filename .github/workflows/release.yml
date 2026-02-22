@@ -9,8 +9,23 @@ on:
 permissions: {}
 
 jobs:
+  verify-tag-version:
+    name: Verify tag/version sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Verify tag/version sync
+        shell: bash
+        run: ./.github/scripts/verify-tag-version.sh "${GITHUB_REF_NAME}"
+
   build:
     name: Build ${{ matrix.target }}
+    needs: verify-tag-version
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read

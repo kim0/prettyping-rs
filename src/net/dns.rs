@@ -77,7 +77,7 @@ fn matches_family(ip: IpAddr, family: AddressFamily) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_once, AddressFamily, ResolveError};
+    use super::{AddressFamily, ResolveError, resolve_once};
 
     #[test]
     fn literal_ipv6_is_rejected_when_ipv4_is_requested() {

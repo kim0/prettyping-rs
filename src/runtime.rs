@@ -1,7 +1,7 @@
 use std::io::{self, IsTerminal, Write};
 use std::num::NonZeroU16;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use thiserror::Error;
@@ -9,9 +9,9 @@ use thiserror::Error;
 use crate::app::{self, AppConfig, AppError, AppEvent, AppReport};
 use crate::config::Config;
 use crate::engine::{EngineTime, PingEngine, PingEngineError, PingEvent, TimedEvent};
+use crate::render::RenderConfig;
 use crate::render::plain::PlainRenderer;
 use crate::render::terminal::TerminalRenderer;
-use crate::render::RenderConfig;
 
 const INTERRUPT_POLL_SLICE: Duration = Duration::from_millis(50);
 
@@ -410,7 +410,7 @@ mod tests {
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;
 
-    use crate::app::{run_with_observer, AppConfig, AppEvent};
+    use crate::app::{AppConfig, AppEvent, run_with_observer};
     use crate::engine::mock::MockEngine;
     use crate::engine::{PingEngine, PingEvent, PingReply, TimedEvent};
 
@@ -492,10 +492,12 @@ mod tests {
             .expect("finish should flush output");
 
         assert!(report.interrupted);
-        assert!(report
-            .events
-            .iter()
-            .any(|event| matches!(event, AppEvent::Interrupted { .. })));
+        assert!(
+            report
+                .events
+                .iter()
+                .any(|event| matches!(event, AppEvent::Interrupted { .. }))
+        );
 
         let sent_sequences: Vec<u64> = engine
             .sent_requests()

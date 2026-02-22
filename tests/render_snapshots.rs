@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use prettyping_rs::app::AppEvent;
+use prettyping_rs::render::RenderConfig;
 use prettyping_rs::render::plain::PlainRenderer;
 use prettyping_rs::render::terminal::TerminalRenderer;
-use prettyping_rs::render::RenderConfig;
 
 fn base_events() -> Vec<AppEvent> {
     vec![

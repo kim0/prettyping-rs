@@ -103,34 +103,34 @@ pub fn normalize(input: ConfigInput) -> Result<Config, ConfigError> {
         return Err(ConfigError::LastOutOfRange);
     }
 
-    if let Some(columns) = input.columns {
-        if columns == 0 || columns > MAX_COLUMNS {
-            return Err(ConfigError::ColumnsOutOfRange);
-        }
+    if let Some(columns) = input.columns
+        && (columns == 0 || columns > MAX_COLUMNS)
+    {
+        return Err(ConfigError::ColumnsOutOfRange);
     }
 
-    if let Some(lines) = input.lines {
-        if lines == 0 || lines > MAX_LINES {
-            return Err(ConfigError::LinesOutOfRange);
-        }
+    if let Some(lines) = input.lines
+        && (lines == 0 || lines > MAX_LINES)
+    {
+        return Err(ConfigError::LinesOutOfRange);
     }
 
-    if let Some(rttmin) = input.rttmin {
-        if rttmin == 0 {
-            return Err(ConfigError::RttMinOutOfRange);
-        }
+    if let Some(rttmin) = input.rttmin
+        && rttmin == 0
+    {
+        return Err(ConfigError::RttMinOutOfRange);
     }
 
-    if let Some(rttmax) = input.rttmax {
-        if rttmax == 0 {
-            return Err(ConfigError::RttMaxOutOfRange);
-        }
+    if let Some(rttmax) = input.rttmax
+        && rttmax == 0
+    {
+        return Err(ConfigError::RttMaxOutOfRange);
     }
 
-    if let (Some(rttmin), Some(rttmax)) = (input.rttmin, input.rttmax) {
-        if rttmin >= rttmax {
-            return Err(ConfigError::InvalidRttRange);
-        }
+    if let (Some(rttmin), Some(rttmax)) = (input.rttmin, input.rttmax)
+        && rttmin >= rttmax
+    {
+        return Err(ConfigError::InvalidRttRange);
     }
 
     let family = match (input.force_ipv4, input.force_ipv6) {
@@ -149,34 +149,34 @@ pub fn normalize(input: ConfigInput) -> Result<Config, ConfigError> {
         }
     }
 
-    if let Some(count) = input.count {
-        if count == 0 {
-            return Err(ConfigError::CountOutOfRange);
-        }
+    if let Some(count) = input.count
+        && count == 0
+    {
+        return Err(ConfigError::CountOutOfRange);
     }
 
-    if let Some(interval_secs) = input.interval_secs {
-        if !interval_secs.is_finite() || interval_secs <= 0.0 {
-            return Err(ConfigError::IntervalOutOfRange);
-        }
+    if let Some(interval_secs) = input.interval_secs
+        && (!interval_secs.is_finite() || interval_secs <= 0.0)
+    {
+        return Err(ConfigError::IntervalOutOfRange);
     }
 
-    if let Some(timeout_secs) = input.timeout_secs {
-        if !timeout_secs.is_finite() || timeout_secs <= 0.0 {
-            return Err(ConfigError::TimeoutOutOfRange);
-        }
+    if let Some(timeout_secs) = input.timeout_secs
+        && (!timeout_secs.is_finite() || timeout_secs <= 0.0)
+    {
+        return Err(ConfigError::TimeoutOutOfRange);
     }
 
-    if let Some(packet_size) = input.packet_size {
-        if packet_size > MAX_PACKET_SIZE {
-            return Err(ConfigError::PacketSizeOutOfRange);
-        }
+    if let Some(packet_size) = input.packet_size
+        && packet_size > MAX_PACKET_SIZE
+    {
+        return Err(ConfigError::PacketSizeOutOfRange);
     }
 
-    if let Some(ttl) = input.ttl {
-        if !(1..=255).contains(&ttl) {
-            return Err(ConfigError::TtlOutOfRange);
-        }
+    if let Some(ttl) = input.ttl
+        && !(1..=255).contains(&ttl)
+    {
+        return Err(ConfigError::TtlOutOfRange);
     }
 
     Ok(Config {

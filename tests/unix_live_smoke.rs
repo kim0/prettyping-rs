@@ -4,7 +4,7 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
-use prettyping_rs::app::{run, AppConfig};
+use prettyping_rs::app::{AppConfig, run};
 use prettyping_rs::engine::unix_surge::{UnixSurgeEngine, UnixSurgeEngineOptions};
 
 const ENV_RUN_SMOKE: &str = "PRETTYPING_RS_RUN_UNIX_LIVE_SMOKE";

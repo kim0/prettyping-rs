@@ -7,6 +7,21 @@ on:
 permissions: {}
 
 jobs:
+  tag-version-check:
+    name: Tag version matches Cargo.toml
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Verify tag/version sync
+        shell: bash
+        run: ./.github/scripts/verify-tag-version.sh "${GITHUB_REF_NAME}"
+
   checks:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

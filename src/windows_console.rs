@@ -9,8 +9,8 @@ pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
 
     use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Console::{
-        GetConsoleMode, GetStdHandle, SetConsoleMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
-        STD_OUTPUT_HANDLE,
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING, GetConsoleMode, GetStdHandle, STD_OUTPUT_HANDLE,
+        SetConsoleMode,
     };
 
     unsafe {

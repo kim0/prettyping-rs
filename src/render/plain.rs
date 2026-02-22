@@ -1,7 +1,7 @@
 use crate::app::AppEvent;
 use crate::render::palette::Palette;
 use crate::render::{
-    format_global_stats_line_plain, format_recent_stats_line, trim_to_width, RenderConfig,
+    RenderConfig, format_global_stats_line_plain, format_recent_stats_line, trim_to_width,
 };
 use crate::stats::Stats;
 

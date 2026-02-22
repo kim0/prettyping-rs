@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
-use prettyping_rs::app::{run, AppConfig, AppEvent};
+use prettyping_rs::app::{AppConfig, AppEvent, run};
 use prettyping_rs::engine::mock::MockEngine;
 use prettyping_rs::engine::{PingEvent, PingReply, TimedEvent};
 
@@ -156,10 +156,12 @@ fn emits_timeout_when_no_reply_arrives() {
     assert_eq!(report.timeouts, 1);
     assert!(!report.interrupted);
 
-    assert!(report
-        .events
-        .iter()
-        .any(|event| matches!(event, AppEvent::ProbeTimeout { seq: 1, .. })));
+    assert!(
+        report
+            .events
+            .iter()
+            .any(|event| matches!(event, AppEvent::ProbeTimeout { seq: 1, .. }))
+    );
 }
 
 #[test]

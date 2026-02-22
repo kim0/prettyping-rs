@@ -1,9 +1,13 @@
 [package]
 name = "prettyping-rs"
-version = "0.1.0"
-edition = "2021"
+version = "1.0.0"
+edition = "2024"
 description = "Rust port of prettyping with a pure Rust ping engine"
 license = "MIT"
+repository = "https://github.com/kim0/prettyping-rs"
+readme = "README.md"
+keywords = ["ping", "network", "latency", "terminal", "cli"]
+categories = ["command-line-utilities", "network-programming"]
 
 [lib]
 name = "prettyping_rs"
