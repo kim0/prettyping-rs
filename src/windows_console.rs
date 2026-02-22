@@ -29,10 +29,8 @@ pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
         }
 
         let new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        if new_mode != mode {
-            if SetConsoleMode(handle, new_mode) == 0 {
-                return Err(io::Error::last_os_error());
-            }
+        if new_mode != mode && SetConsoleMode(handle, new_mode) == 0 {
+            return Err(io::Error::last_os_error());
         }
 
         Ok(())

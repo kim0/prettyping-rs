@@ -387,7 +387,7 @@ impl SignalHooks {
         ctrlc::set_handler(move || {
             interrupt.store(true, Ordering::SeqCst);
         })
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
+        .map_err(|err| io::Error::other(err.to_string()))?;
 
         Ok(Self)
     }

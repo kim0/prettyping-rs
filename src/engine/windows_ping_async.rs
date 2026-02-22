@@ -8,8 +8,7 @@ use ping_async::IcmpEchoStatus;
 use thiserror::Error;
 
 use super::{
-    EngineTime, PingEngine, PingEngineError, PingEvent, PingReply, ProbeRequest, SequenceNumber,
-    TimedEvent,
+    EngineTime, PingEngine, PingEngineError, PingEvent, PingReply, ProbeRequest, TimedEvent,
 };
 
 const WINDOWS_ERROR_ACCESS_DENIED: i32 = 5;
@@ -44,7 +43,6 @@ enum BackendMessage {
 
 pub struct WindowsPingAsyncEngine {
     target: IpAddr,
-    timeout: Duration,
     ttl: Option<u8>,
     now: EngineTime,
     started_at: Instant,
@@ -83,7 +81,6 @@ impl WindowsPingAsyncEngine {
 
         Ok(Self {
             target: options.target,
-            timeout: options.timeout,
             ttl: options.ttl,
             now: Duration::ZERO,
             started_at: Instant::now(),
