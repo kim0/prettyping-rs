@@ -210,6 +210,9 @@ impl PingEngine for WindowsPingAsyncEngine {
                     | IcmpEchoStatus::Unknown => {}
                 },
                 Err(err) => {
+                    if is_transient_probe_io_error(&err) {
+                        return;
+                    }
                     let message = format_windows_io_error(
                         &format!("windows backend failed while probing seq {requested_seq}"),
                         &err,
@@ -331,11 +334,25 @@ fn windows_error_guidance(error: &io::Error) -> Option<String> {
     }
 }
 
+fn is_transient_probe_io_error(error: &io::Error) -> bool {
+    let is_transient_raw_code = error.raw_os_error().is_some_and(|code| {
+        matches!(
+            code,
+            WINDOWS_ERROR_NETWORK_UNREACHABLE
+                | WINDOWS_ERROR_HOST_UNREACHABLE
+                | WINDOWS_WSAENETUNREACH
+                | WINDOWS_WSAEHOSTUNREACH
+        )
+    });
+
+    is_transient_raw_code || error.kind() == io::ErrorKind::NotConnected
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
 
-    use super::windows_error_guidance;
+    use super::{is_transient_probe_io_error, windows_error_guidance};
 
     #[test]
     fn maps_access_denied_to_firewall_guidance() {
@@ -353,5 +370,29 @@ mod tests {
 
         assert!(message.contains("Network unreachable"));
         assert!(message.contains("route print"));
+    }
+
+    #[test]
+    fn transient_network_errors_are_non_fatal() {
+        let err = io::Error::from_raw_os_error(1_231);
+        assert!(is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn access_denied_is_not_transient() {
+        let err = io::Error::from_raw_os_error(5);
+        assert!(!is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn not_connected_kind_is_treated_as_transient() {
+        let err = io::Error::from(io::ErrorKind::NotConnected);
+        assert!(is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn raw_wsa_not_connected_errno_is_treated_as_transient() {
+        let err = io::Error::from_raw_os_error(10_057);
+        assert!(is_transient_probe_io_error(&err));
     }
 }

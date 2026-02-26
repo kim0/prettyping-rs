@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -12,6 +13,10 @@ use super::{
 };
 
 const UNIX_PERMISSION_DENIED_ERRNO: [i32; 2] = [1, 13]; // EPERM, EACCES
+#[cfg(target_os = "linux")]
+const UNIX_TRANSIENT_ROUTE_ERRNO: [i32; 3] = [100, 101, 113]; // ENETDOWN, ENETUNREACH, EHOSTUNREACH
+#[cfg(target_os = "macos")]
+const UNIX_TRANSIENT_ROUTE_ERRNO: [i32; 3] = [50, 51, 65]; // ENETDOWN, ENETUNREACH, EHOSTUNREACH
 const U16_MODULO: u64 = u16::MAX as u64 + 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,6 +250,9 @@ impl PingEngine for UnixSurgeEngine {
                 }
                 Err(surge_ping::SurgeError::Timeout { .. }) => {}
                 Err(surge_ping::SurgeError::IOError(io_err)) => {
+                    if is_transient_probe_io_error(&io_err) {
+                        return;
+                    }
                     let message = format_io_error_with_guidance(
                         "failed while sending/receiving ICMP",
                         &io_err,
@@ -357,11 +365,20 @@ fn permission_guidance(error: &std::io::Error) -> Option<String> {
     None
 }
 
+fn is_transient_probe_io_error(error: &io::Error) -> bool {
+    let is_transient_raw_code = error
+        .raw_os_error()
+        .map(|code| UNIX_TRANSIENT_ROUTE_ERRNO.contains(&code))
+        .unwrap_or(false);
+
+    is_transient_raw_code || error.kind() == io::ErrorKind::NotConnected
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
 
-    use super::permission_guidance;
+    use super::{is_transient_probe_io_error, permission_guidance};
 
     #[test]
     fn permission_guidance_is_actionable() {
@@ -379,5 +396,42 @@ mod tests {
             assert!(message.contains("Terminal"));
             assert!(message.contains("elevated"));
         }
+    }
+
+    #[test]
+    fn transient_route_errors_are_classified_as_non_fatal() {
+        #[cfg(target_os = "linux")]
+        let err = io::Error::from_raw_os_error(101);
+        #[cfg(target_os = "macos")]
+        let err = io::Error::from_raw_os_error(65);
+
+        assert!(is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn permission_denied_is_not_treated_as_transient() {
+        let err = io::Error::from_raw_os_error(13);
+        assert!(!is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn not_connected_kind_is_treated_as_transient() {
+        let err = io::Error::from(io::ErrorKind::NotConnected);
+        assert!(is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn raw_not_connected_errno_is_treated_as_transient() {
+        #[cfg(target_os = "linux")]
+        let err = io::Error::from_raw_os_error(107);
+        #[cfg(target_os = "macos")]
+        let err = io::Error::from_raw_os_error(57);
+        assert!(is_transient_probe_io_error(&err));
+    }
+
+    #[test]
+    fn unknown_io_error_is_not_treated_as_transient() {
+        let err = io::Error::other("unexpected");
+        assert!(!is_transient_probe_io_error(&err));
     }
 }

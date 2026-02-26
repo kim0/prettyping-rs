@@ -13,6 +13,12 @@
 
 If localhost fails, focus on local permissions/firewall before remote routing.
 
+### During network transitions (Wi-Fi/VPN switch)
+
+If routing disappears temporarily (for example `No route to host`), `prettyping`
+keeps running and treats probes as packet loss/timeouts until connectivity returns.
+Only non-recoverable runtime/backend failures terminate the process.
+
 ## Linux: ICMP permission denied
 
 Symptoms:
